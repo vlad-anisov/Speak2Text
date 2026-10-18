@@ -48,6 +48,7 @@ private let russian: [String: String] = [
     "to record your voice": "чтобы записывать голос",
     "to see the hotkey": "чтобы видеть горячую клавишу",
     "to paste the text with Cmd+V": "чтобы вставлять текст через Cmd+V",
+    "Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again.": "Speak2Text нет в списке «Мониторинг ввода»? Закройте Системные настройки (⌘Q) и нажмите кнопку ещё раз.",
     "If the app is already in the list, remove it with the − button and add it again.": "Если приложение уже в списке, удалите его кнопкой − и добавьте снова.",
     "Granted but still showing ✗? The app must be restarted.": "Выдали, но всё ещё ✗? Приложение нужно перезапустить.",
     "Restart": "Перезапустить",

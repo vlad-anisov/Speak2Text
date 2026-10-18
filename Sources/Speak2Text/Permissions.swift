@@ -27,7 +27,11 @@ final class PermissionsModel: ObservableObject {
             AVCaptureDevice.requestAccess(for: .audio) { _ in DispatchQueue.main.async { self.refresh() } }
         } else { Permissions.open("Privacy_Microphone") }
     }
-    func openInput() { _ = CGRequestListenEventAccess(); Permissions.open("Privacy_ListenEvent") }
+    func openInput() {
+        Permissions.registerInputMonitoring()
+        // Give TCC a moment to add the row, otherwise the pane opens with a stale list.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Permissions.open("Privacy_ListenEvent") }
+    }
     func openAX() {
         _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
         Permissions.open("Privacy_Accessibility")
@@ -37,6 +41,18 @@ final class PermissionsModel: ObservableObject {
 enum Permissions {
     static func open(_ pane: String) {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
+    }
+
+    /// Adds the app to the Input Monitoring list (unchecked) and shows the system prompt,
+    /// so the user only has to flip the switch instead of adding the app with +.
+    static func registerInputMonitoring() {
+        guard !CGPreflightListenEventAccess() else { return }
+        _ = CGRequestListenEventAccess()
+        let mask = CGEventMask(1) << CGEventType.keyDown.rawValue
+        let cb: CGEventTapCallBack = { _, _, e, _ in Unmanaged.passUnretained(e) }
+        if let t = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .listenOnly,
+                                     eventsOfInterest: mask, callback: cb, userInfo: nil) { CFMachPortInvalidate(t) }
+        appLog("input monitoring requested")
     }
 
     /// Starts a fresh copy of the app and quits this one (a granted permission is only seen by a new process).
@@ -59,6 +75,8 @@ struct PermissionsView: View {
             row(L("Input Monitoring"), L("to see the hotkey"), m.input, m.openInput)
             row(L("Accessibility"), L("to paste the text with Cmd+V"), m.ax, m.openAX)
             if !m.allOK {
+                Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again."))
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(L("If the app is already in the list, remove it with the − button and add it again."))
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {

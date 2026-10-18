@@ -102,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.$hotkey.combineLatest(settings.$mode).sink { [weak self] spec, mode in
             self?.hotkey.configure(spec: spec, toggleMode: mode == "toggle")
         }.store(in: &cancellables)
+        Permissions.registerInputMonitoring()
         checkPerms(prompt: false)
         permTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.checkPerms(prompt: false) }
         appLog("microphone access: \(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized)")
