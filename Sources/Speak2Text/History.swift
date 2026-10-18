@@ -30,6 +30,8 @@ final class HistoryStore: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var items: [HistoryItem] = []
     @Published private(set) var playingID: String?
     @Published private(set) var busy: Set<String> = []
+    /// The row whose full text is shown (one at a time).
+    @Published var expandedID: String?
     private var player: AVAudioPlayer?
     /// Screenshot mode: dummy items, nothing is read from or written to the disk.
     private let demo: Bool
@@ -161,6 +163,9 @@ final class HistoryStore: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // MARK: demo
 
+    /// Screenshot mode: the id of the long demo entry.
+    var demoLongID: String? { demo ? items.first(where: { $0.text.count > 300 })?.id : nil }
+
     private static func demoItems() -> [HistoryItem] {
         let now = Date()
         func it(_ ago: Double, _ dur: Double, _ text: String, raw: String? = nil) -> HistoryItem {
@@ -169,6 +174,7 @@ final class HistoryStore: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let ru = isRussian
         return [
             it(120, 6.4, ru ? "Давай созвонимся завтра в десять и обсудим план релиза." : "Let's catch up tomorrow at ten and go through the release plan."),
+            it(600, 58.0, ru ? "Итоги по релизу. Во-первых, мы закончили переработку истории: записи теперь раскрываются по клику, а текст можно выделять и копировать. Во-вторых, обновили словарь замен и добавили встроенные правила для самых частых терминов. В-третьих, нужно проверить автообновление на чистой системе и убедиться, что подпись дельта-архива совпадает. После этого можно публиковать версию, написать короткие заметки о выпуске и обновить описание на странице проекта. Если что-то пойдёт не так, откатываемся на предыдущую сборку и разбираемся по логам." : "Release summary. First, we finished reworking the history: entries now expand on click, and the text can be selected and copied. Second, we updated the replacement dictionary and added built-in rules for the most common terms. Third, we need to check auto-update on a clean system and make sure the delta archive signature matches. After that we can publish the version, write short release notes and update the project page description. If anything goes wrong, we roll back to the previous build and dig through the logs."),
             it(1900, 14.2, ru ? "Добавил проверку на пустой ответ, поправил тесты и обновил описание в README." : "Added a check for an empty response, fixed the tests and updated the README description.",
                raw: ru ? "добавил проверку на пустой ответ поправил тесты и обновил описание в ридми" : "added a check for an empty response fixed the tests and updated the readme description"),
             it(7200, 2.1, ""),

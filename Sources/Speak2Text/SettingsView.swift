@@ -246,6 +246,23 @@ struct HistoryRow: View {
     @ObservedObject var h: HistoryStore
     let engineReady: Bool
 
+    private var expanded: Bool { h.expandedID == item.id }
+
+    /// lineLimit(nil) + fixedSize(vertical): the text takes its full height, so the card (and the rows below) grow with it.
+    @ViewBuilder private var bodyText: some View {
+        let t = Text(item.text).lineLimit(expanded ? nil : 3).fixedSize(horizontal: false, vertical: true)
+        if expanded {
+            t.textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            t.textSelection(.disabled).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func toggleExpanded() {
+        guard !item.text.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.2)) { h.expandedID = expanded ? nil : item.id }
+    }
+
     private var durationText: String {
         let t = Int(item.duration.rounded())
         return String(format: "%d:%02d", t / 60, t % 60)
@@ -263,7 +280,7 @@ struct HistoryRow: View {
             if item.text.isEmpty {
                 Text(L("No text recognized")).italic().foregroundStyle(.secondary)
             } else {
-                Text(item.text).lineLimit(3).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                bodyText
             }
             HStack(spacing: 14) {
                 action("doc.on.doc", L("Copy text"), enabled: !item.text.isEmpty) { h.copy(item) }
@@ -278,6 +295,8 @@ struct HistoryRow: View {
             }
         }
         .padding(10)
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture(perform: toggleExpanded)
         .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.6)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.2)))
         .contextMenu {

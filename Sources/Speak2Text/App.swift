@@ -136,6 +136,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let w = self.settingsWindow { captureWindow(w, to: "\(dir)/settings-\(t)\(CommandLine.arguments.contains("--fake-missing-permissions") ? "-permissions" : "").png") }
             }
             delay += 2.0
+            if t == "history" {
+                // live toggle after the initial layout: expand the long entry, let the runloop settle, capture
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay - 0.6) {
+                    withAnimation(.easeInOut(duration: 0.2)) { HistoryStore.shared.expandedID = HistoryStore.shared.demoLongID }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.1) {
+                    if let w = self.settingsWindow { captureWindow(w, to: "\(dir)/settings-history-expanded.png") }
+                    HistoryStore.shared.expandedID = nil
+                }
+                delay += 1.0
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { NSApp.terminate(nil) }
     }
