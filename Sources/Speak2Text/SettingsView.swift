@@ -12,6 +12,7 @@ struct SettingsView: View {
             GeneralTab().tabItem { Label(L("General"), systemImage: "gearshape") }.tag("general")
             ModelTab().tabItem { Label(L("Model"), systemImage: "cpu") }.tag("model")
             DictionaryTab().tabItem { Label(L("Dictionary"), systemImage: "text.book.closed") }.tag("dictionary")
+            AboutTab().tabItem { Label(L("About"), systemImage: "info.circle") }.tag("about")
         }
         .frame(width: 520, height: 440)
     }
@@ -250,5 +251,22 @@ struct ModelTab: View {
         } else if let samples = SpeedTest.builtInSample() {
             test.run(samples: samples, modelFolder: folder, language: lang)
         } else { testNote = L("Built-in sample not found") }
+    }
+}
+
+struct AboutTab: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 72, height: 72)
+            Text("Speak2Text").font(.title2.bold())
+            Text(String(format: L("Version %@"), Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"))
+                .foregroundStyle(.secondary)
+            Text(L("Local push-to-talk dictation. Nothing leaves your Mac.")).font(.callout)
+            Button(L("Check for Updates…")) { AppDelegate.shared?.updater.checkForUpdates(nil) }
+            Link("github.com/vlad-anisov/Speak2Text", destination: URL(string: "https://github.com/vlad-anisov/Speak2Text")!)
+            Spacer()
+        }
+        .padding(.top, 24)
+        .frame(maxWidth: .infinity)
     }
 }

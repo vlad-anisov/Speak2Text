@@ -15,6 +15,9 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>SUFeedURL</key><string>https://github.com/vlad-anisov/Speak2Text/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>Yqi9db83F/PaJSpxe6oG3hJKqzNXKSHdxlbYMmenZQg=</string>
+    <key>SUEnableAutomaticChecks</key><true/>
     <key>NSMicrophoneUsageDescription</key><string>Speak2Text records your voice while the hotkey is active and recognizes it locally.</string>
 </dict>
 </plist>

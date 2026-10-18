@@ -13,6 +13,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN/Speak2Text" "$APP/Contents/MacOS/Speak2Text"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+if [ -n "${S2T_VERSION:-}" ]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $S2T_VERSION" -c "Set :CFBundleVersion ${S2T_BUILD:-$S2T_VERSION}" "$APP/Contents/Info.plist"
+fi
 for l in en ru; do mkdir -p "$APP/Contents/Resources/$l.lproj"; cp Resources/$l.lproj/InfoPlist.strings "$APP/Contents/Resources/$l.lproj/"; done
 cp Resources/AppIcon.icns "$APP/Contents/Resources/" 2>/dev/null || echo "note: Resources/AppIcon.icns not found, default icon"
 cp Resources/MenuBarIcon*.png "$APP/Contents/Resources/" 2>/dev/null || echo "note: Resources/MenuBarIcon*.png not found, using SF Symbol waveform"
@@ -34,6 +37,7 @@ fi
 codesign -s "$IDENTITY" --force --deep "$APP"
 codesign -dv "$APP" 2>&1 | grep -E "Identifier|Authority=Apple Dev|Signature" || true
 
+if [ -n "${S2T_NO_INSTALL:-}" ]; then echo "Built $PWD/$APP (not installed)"; exit 0; fi
 mkdir -p "$HOME/Applications"
 pkill -x Speak2Text 2>/dev/null && sleep 1 || true
 rm -rf "$DEST"

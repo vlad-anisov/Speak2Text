@@ -2,11 +2,13 @@ import Cocoa
 import AVFoundation
 import Combine
 import SwiftUI
+import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shared: AppDelegate?
     var settingsWindow: NSWindow?
     var permWindow: NSWindow?
+    let updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     let overlay = OverlayController()
     let muter = AudioMuter()
     var signalSources: [DispatchSourceSignal] = []
@@ -63,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.addItem(.separator())
         m.addItem(withTitle: L("Permissions…"), action: #selector(openPermissions), keyEquivalent: "").target = self
         m.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
+        let up = m.addItem(withTitle: L("Check for Updates…"), action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        up.target = updater
         m.addItem(withTitle: L("Open Log"), action: #selector(openLog), keyEquivalent: "").target = self
         m.addItem(.separator())
         m.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
