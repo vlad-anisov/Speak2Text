@@ -11,15 +11,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var signalSources: [DispatchSourceSignal] = []
     enum State { case loading, idle, recording, finishing }
     var item: NSStatusItem!
-    var state: State = .loading { didSet { updateIcon() } }
+    var state: State = .loading { didSet { updateIcon(); if oldValue != state { rebuildMenu() } } }
+    let manager = EngineManager.shared
     let settings = Settings.shared
-    var engine: WhisperEngine!
+    var engine: WhisperEngine? { manager.engine }
     var hotkey: Hotkey!
     var recorder: Recorder?
     var session: LiveTranscriber?
     var recStart = 0.0
     var inputOK = false, axOK = false
     var permTimer: Timer?
+    var iconPulse: Timer?
     var cancellables = Set<AnyCancellable>()
 
     func checkPerms(prompt: Bool) {
@@ -49,6 +51,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !axOK { let i = m.addItem(withTitle: L("Accessibility") + "…", action: #selector(openAX), keyEquivalent: ""); i.target = self }
             m.addItem(.separator())
         }
+        let st: String
+        switch manager.status {
+        case .needsDownload: st = L("Model is not downloaded")
+        case .failed: st = L("Model failed to load")
+        case .preparing: st = L("Preparing model…")
+        case .ready: st = state == .recording ? L("Recording…") : state == .finishing ? L("Recognizing…") : L("Ready")
+        }
+        let si = m.addItem(withTitle: L("Status: ") + st, action: nil, keyEquivalent: ""); si.isEnabled = false
+        m.addItem(.separator())
         m.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: L("Open Log"), action: #selector(openLog), keyEquivalent: "").target = self
         m.addItem(.separator())
@@ -88,32 +99,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         checkPerms(prompt: true)
         permTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.checkPerms(prompt: false) }
         AVCaptureDevice.requestAccess(for: .audio) { ok in appLog("microphone access: \(ok)") }
-        guard let folder = ModelCatalog.folder(for: settings.model) else { appLog("model not downloaded: \(settings.model)"); return }
-        engine = WhisperEngine(modelFolder: folder, accelerator: settings.accelerator, language: settings.language, step: settings.step)
-        Task {
-            let t = nowS()
-            do { try await engine.load(); appLog(String(format: "model loaded+warmed in %.1f s", nowS() - t)) }
-            catch { appLog("model load FAILED: \(error)"); return }
-            await MainActor.run { self.state = .idle }
+        manager.$status.receive(on: DispatchQueue.main).sink { [weak self] st in
+            guard let self else { return }
+            if st == .ready { if self.state == .loading { self.state = .idle } }
+            else if self.state == .idle { self.state = .loading }
+            self.rebuildMenu()
+        }.store(in: &cancellables)
+        settings.$model.combineLatest(settings.$accelerator).dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
+            self?.manager.reload()
+        }.store(in: &cancellables)
+        manager.reload()
+    }
+
+    private func menuIcon(_ name: String) -> NSImage? {
+        // MenuBarIcon.png + @2x from the bundle (template); SF Symbol as a fallback
+        let img = Bundle.main.path(forResource: name, ofType: "png").flatMap { NSImage(contentsOfFile: $0) }
+        if let img {
+            if let rep2 = Bundle.main.path(forResource: name + "@2x", ofType: "png").flatMap({ NSImageRep(contentsOfFile: $0) }) { img.addRepresentation(rep2) }
+            img.size = NSSize(width: 18, height: 18)
+            img.isTemplate = true
+            return img
+        }
+        return NSImage(systemSymbolName: "waveform", accessibilityDescription: "Speak2Text")
+    }
+
+    /// Normal icon; the Rec variant while recording; loading and recognizing pulse the normal icon.
+    func updateIcon() {
+        item.button?.image = menuIcon(state == .recording ? "MenuBarIconRec" : "MenuBarIcon")
+        item.button?.title = ""
+        iconPulse?.invalidate(); iconPulse = nil
+        item.button?.alphaValue = 1
+        if state == .loading || state == .finishing {
+            iconPulse = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { [weak self] _ in
+                let t = Date.timeIntervalSinceReferenceDate
+                self?.item.button?.alphaValue = CGFloat(0.55 + 0.45 * (0.5 + 0.5 * sin(t * 5)))
+            }
         }
     }
 
-    func updateIcon() {
-        let (sym, title): (String, String) = {
-            switch state {
-            case .loading: return ("hourglass", "…")
-            case .idle: return ("mic", "")
-            case .recording: return ("mic.fill", " REC")
-            case .finishing: return ("ellipsis.circle", " …")
-            }
-        }()
-        item.button?.image = NSImage(systemSymbolName: sym, accessibilityDescription: title)
-        item.button?.title = title
-        item.button?.contentTintColor = state == .recording ? .systemRed : nil
-    }
-
     func startRecording() {
-        guard state == .idle else { return }
+        guard state == .idle, let engine else { return }
         engine.language = settings.language
         engine.promptTokens = settings.promptEnabled ? engine.tokens(forPrompt: settings.promptTerms) : nil
         let s = engine.newSession()
@@ -152,12 +177,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             let dur = Double(s.totalSamples) / 16000.0
             let raw = await s.finish()
-            let text = TextProcessor.current(normalizeText(raw))
             await MainActor.run {
+                let text = TextProcessor.current(normalizeText(raw))
                 if text.isEmpty { appLog("empty result, nothing inserted"); self.overlay.hide() } else { Inserter.insert(text); self.overlay.done() }
                 let wait = nowS() - tRelease
                 appLog(String(format: "audio=%.2fs final_wait=%.2fs len=%d text=%@", dur, wait, text.count, text))
-                self.state = .idle
+                self.state = self.manager.status == .ready ? .idle : .loading
             }
         }
     }

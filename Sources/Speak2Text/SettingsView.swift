@@ -1,10 +1,17 @@
 import SwiftUI
 
+final class SettingsNav: ObservableObject {
+    static let shared = SettingsNav()
+    @Published var tab = "general"
+}
+
 struct SettingsView: View {
+    @ObservedObject var nav = SettingsNav.shared
     var body: some View {
-        TabView {
-            GeneralTab().tabItem { Label(L("General"), systemImage: "gearshape") }
-            DictionaryTab().tabItem { Label(L("Dictionary"), systemImage: "text.book.closed") }
+        TabView(selection: $nav.tab) {
+            GeneralTab().tabItem { Label(L("General"), systemImage: "gearshape") }.tag("general")
+            ModelTab().tabItem { Label(L("Model"), systemImage: "cpu") }.tag("model")
+            DictionaryTab().tabItem { Label(L("Dictionary"), systemImage: "text.book.closed") }.tag("dictionary")
         }
         .frame(width: 520, height: 440)
     }
@@ -124,5 +131,122 @@ struct DictionaryTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+struct ModelTab: View {
+    @ObservedObject var s = Settings.shared
+    @ObservedObject var m = EngineManager.shared
+    @StateObject private var test = SpeedTest()
+    @State private var useMic = false
+    @State private var testNote: String?
+
+    var body: some View {
+        Form {
+            Section(L("Model")) {
+                ForEach(ModelCatalog.all) { info in modelRow(info) }
+                Picker(L("Accelerator"), selection: $s.accelerator) {
+                    Text("Neural Engine").tag(Accelerator.ane)
+                    Text("GPU").tag(Accelerator.gpu)
+                    Text("CPU").tag(Accelerator.cpu)
+                }
+                statusLine
+                Text(L("Changing the model or accelerator recompiles CoreML: the first load can take up to about 3 minutes. Do not quit the app meanwhile."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section(L("Speed test")) {
+                Picker(L("Sample"), selection: $useMic) {
+                    Text(L("Built-in sample")).tag(false)
+                    Text(L("Microphone, 5 s")).tag(true)
+                }.pickerStyle(.segmented)
+                HStack {
+                    Button(test.running ? L("Testing…") : L("Run test")) { runTest() }
+                        .disabled(test.running || test.recordingLeft != nil || ModelCatalog.folder(for: s.model) == nil || AppDelegate.shared?.state == .recording)
+                    if let left = test.recordingLeft { Text(String(format: L("Speak now: %d s"), left)) }
+                    if let n = testNote { Text(n).foregroundStyle(.red).font(.caption) }
+                    Spacer()
+                    if let b = test.best, !test.running {
+                        Button(String(format: L("Use best: %@"), name(b))) { s.accelerator = b }.disabled(s.accelerator == b)
+                    }
+                }
+                if !test.rows.isEmpty {
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                        GridRow {
+                            Text(L("Accelerator")).bold(); Text(L("Load, s")).bold(); Text(L("Recognize, s")).bold(); Text(L("Text")).bold()
+                        }
+                        ForEach(test.rows) { r in
+                            GridRow {
+                                Text(name(r.id))
+                                Text(r.running ? "…" : r.loadS.map { String(format: "%.1f", $0) } ?? "–").monospacedDigit()
+                                Text(r.running ? "…" : r.recogS.map { String(format: "%.2f", $0) } ?? "–").monospacedDigit()
+                                Text(r.error ?? r.text).lineLimit(2).font(.caption).foregroundStyle(r.error == nil ? Color.primary : Color.red)
+                            }
+                        }
+                    }
+                }
+                Text(L("The first run on each accelerator is slow: CoreML compiles the model for it (up to a few minutes). Later runs are fast."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func name(_ a: Accelerator) -> String { a == .ane ? "Neural Engine" : a == .gpu ? "GPU" : "CPU" }
+
+    @ViewBuilder private func modelRow(_ info: ModelInfo) -> some View {
+        let have = ModelCatalog.folder(for: info.id) != nil
+        HStack {
+            Image(systemName: s.model == info.id ? "largecircle.fill.circle" : "circle")
+                .foregroundStyle(have ? Color.accentColor : Color.secondary)
+                .onTapGesture { if have { s.model = info.id } }
+            VStack(alignment: .leading) {
+                Text(info.title)
+                Text("\(info.sizeMB) MB").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if let p = m.downloads[info.id] {
+                ProgressView(value: p).frame(width: 90)
+                Text("\(Int(p * 100))%").monospacedDigit().font(.caption)
+            } else if have {
+                Text(L("Downloaded")).font(.caption).foregroundStyle(.secondary)
+            } else {
+                if let e = m.downloadErrors[info.id] { Text(e).font(.caption).foregroundStyle(.red).lineLimit(1) }
+                Button(L("Download")) { m.download(info.id) }
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private var statusLine: some View {
+        switch m.status {
+        case .preparing:
+            HStack {
+                ProgressView().controlSize(.small)
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    let secs = Int(ctx.date.timeIntervalSince(m.preparingSince ?? ctx.date))
+                    Text(String(format: "%@ %d:%02d", L("Preparing model…"), secs / 60, secs % 60)).monospacedDigit()
+                }
+            }
+        case .ready:
+            Label(m.lastLoadSeconds.map { String(format: L("Ready (loaded in %.1f s)"), $0) } ?? L("Ready"), systemImage: "checkmark.circle").foregroundStyle(.green)
+        case .needsDownload:
+            Label(L("Model is not downloaded"), systemImage: "arrow.down.circle").foregroundStyle(.orange)
+        case .failed(let e):
+            Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(.red).lineLimit(3)
+        }
+    }
+
+    private func runTest() {
+        testNote = nil
+        guard let folder = ModelCatalog.folder(for: s.model) else { return }
+        let lang = s.language
+        if useMic {
+            test.recordSample { samples in
+                guard let samples, samples.count > 16000 else { testNote = L("No audio from the microphone"); return }
+                test.run(samples: samples, modelFolder: folder, language: lang)
+            }
+        } else if let samples = SpeedTest.builtInSample() {
+            test.run(samples: samples, modelFolder: folder, language: lang)
+        } else { testNote = L("Built-in sample not found") }
     }
 }

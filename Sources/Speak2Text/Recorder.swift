@@ -50,3 +50,21 @@ final class Recorder {
         }
     }
 }
+
+func loadWav(_ path: String) throws -> [Float] {
+    let f = try AVAudioFile(forReading: URL(fileURLWithPath: path))
+    let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
+    let conv = AVAudioConverter(from: f.processingFormat, to: fmt)!
+    let inBuf = AVAudioPCMBuffer(pcmFormat: f.processingFormat, frameCapacity: AVAudioFrameCount(f.length))!
+    try f.read(into: inBuf)
+    let cap = AVAudioFrameCount(Double(f.length) * 16000 / f.processingFormat.sampleRate) + 1024
+    let out = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: cap)!
+    var given = false
+    var err: NSError?
+    conv.convert(to: out, error: &err) { _, st in
+        if given { st.pointee = .endOfStream; return nil }
+        given = true; st.pointee = .haveData; return inBuf
+    }
+    if let e = err { throw e }
+    return Array(UnsafeBufferPointer(start: out.floatChannelData![0], count: Int(out.frameLength)))
+}
