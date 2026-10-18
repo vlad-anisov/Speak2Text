@@ -132,7 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if state == .loading || state == .finishing {
             iconPulse = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { [weak self] _ in
                 let t = Date.timeIntervalSinceReferenceDate
-                self?.item.button?.alphaValue = CGFloat(0.55 + 0.45 * (0.5 + 0.5 * sin(t * 5)))
+                let k: Double = 0.5 + 0.5 * sin(t * 5)
+                self?.item.button?.alphaValue = CGFloat(0.55 + 0.45 * k)
             }
         }
     }
