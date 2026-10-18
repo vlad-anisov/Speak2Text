@@ -104,7 +104,7 @@ Regenerate the start/stop sounds with `python3 scripts/make_sounds.py`. See [doc
 - Language: "Same as system" (default; falls back to auto-detect if the system language is not supported), "Auto-detect" or any Whisper language.
 - Right-click the menu bar icon for Settings and Quit.
 - The text is pasted with Cmd+V; your previous clipboard contents are restored right after.
-- History keeps dictations forever, 30 days (default), 7 days or 1 day, or can be turned off. Click an entry to see the full text and copy it, listen to the recording, re-transcribe it or delete it.
+- History keeps dictations forever, 30 days (default), 7 days or 1 day, or can be turned off. Each entry has buttons to copy the text, listen to the recording, re-transcribe it or delete it.
 
 ## Screenshots
 
