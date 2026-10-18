@@ -11,6 +11,7 @@ final class PermissionsModel: ObservableObject {
     var allOK: Bool { mic && input && ax }
 
     func refresh() {
+        if CommandLine.arguments.contains("--fake-missing-permissions") { mic = true; input = false; ax = false; return }   // screenshots only
         mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         input = CGPreflightListenEventAccess()
         ax = AXIsProcessTrusted()
@@ -62,49 +63,6 @@ enum Permissions {
         p.arguments = ["-c", "sleep 1; open -n \"\(Bundle.main.bundlePath)\""]
         try? p.run()
         NSApp.terminate(nil)
-    }
-}
-
-struct PermissionsView: View {
-    @StateObject private var m = PermissionsModel()
-
-    var body: some View {
-        Form {
-            Section {
-                row(L("Microphone"), L("to record your voice"), m.mic, m.openMic)
-                row(L("Input Monitoring"), L("to see the hotkey"), m.input, m.openInput)
-                row(L("Accessibility"), L("to paste the text with Cmd+V"), m.ax, m.openAX)
-            } header: {
-                Text(L("Speak2Text needs three permissions"))
-            } footer: {
-                if !m.allOK {
-                    Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again.") + " " + L("If the app is already in the list, remove it with the − button and add it again.")).footerStyle()
-                }
-            }
-            Section {
-                if !m.allOK {
-                    HStack {
-                        Text(L("Granted but still showing ✗? The app must be restarted.")).foregroundStyle(.secondary)
-                        Spacer()
-                        Button(L("Restart")) { Permissions.relaunch() }
-                    }
-                } else {
-                    Label(L("All set. You can close this window."), systemImage: "checkmark.seal").foregroundStyle(.green)
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .onAppear { m.startPolling() }
-        .onDisappear { m.stopPolling() }
-    }
-
-    private func row(_ title: String, _ why: String, _ ok: Bool, _ action: @escaping () -> Void) -> some View {
-        HStack {
-            Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill").foregroundStyle(ok ? .green : .red).font(.title3)
-            VStack(alignment: .leading) { Text(title); Text(why).font(.caption).foregroundStyle(.secondary) }
-            Spacer()
-            if !ok { Button(L("Open Settings")) { action() } }
-        }
     }
 }
 

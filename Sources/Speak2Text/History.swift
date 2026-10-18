@@ -152,7 +152,7 @@ final class HistoryStore: NSObject, ObservableObject, AVAudioPlayerDelegate {
         guard it.hasAudio, !busy.contains(it.id), let engine = EngineManager.shared.engine, !demo else { return }
         busy.insert(it.id)
         let url = HistoryStore.audioURL(it)
-        let lang = Settings.shared.language
+        let lang = Settings.shared.recognitionLanguage
         Task {
             let raw: String?
             if let samples = try? loadWav(url.path) {

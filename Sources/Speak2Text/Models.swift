@@ -45,11 +45,13 @@ final class EngineManager: ObservableObject, @unchecked Sendable {
         if loading { dirty = true; return }
         let st = Settings.shared
         guard let folder = ModelCatalog.folder(for: ModelCatalog.modelID) else {
-            engine = nil; status = .needsDownload; appLog("model not downloaded: \(ModelCatalog.modelID)"); return
+            engine = nil; status = .needsDownload; appLog("model not downloaded: \(ModelCatalog.modelID)")
+            download()   // the model is fixed and not user-selectable: fetch it automatically
+            return
         }
         loading = true; dirty = false
         status = .preparing; preparingSince = Date()
-        let e = WhisperEngine(modelFolder: folder, accelerator: st.accelerator, language: st.language, step: st.step)
+        let e = WhisperEngine(modelFolder: folder, accelerator: st.accelerator, language: st.recognitionLanguage, step: st.step)
         appLog("loading model \(ModelCatalog.modelID) accelerator=\(st.accelerator.rawValue)")
         Task {
             let t = nowS()

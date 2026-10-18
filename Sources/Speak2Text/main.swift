@@ -4,7 +4,7 @@ import AVFoundation
 func runFile(_ path: String) async {
     let st = Settings.shared
     guard let folder = ModelCatalog.folder(for: ModelCatalog.modelID) else { print("error: model \(ModelCatalog.modelID) not found"); exit(1) }
-    let engine = WhisperEngine(modelFolder: folder, accelerator: st.accelerator, language: st.language, step: st.step)
+    let engine = WhisperEngine(modelFolder: folder, accelerator: st.accelerator, language: st.recognitionLanguage, step: st.step)
     do {
         let t = nowS()
         try await engine.load()
@@ -31,6 +31,7 @@ func runFile(_ path: String) async {
 }
 
 let args = CommandLine.arguments
+if args.contains("--test-language") { print("system languages:", systemLanguages(), "-> system =", WhisperLanguages.resolve("system"), "; count:", WhisperLanguages.all.count, "; first:", WhisperLanguages.all.prefix(4).map { $0.name }, "; en:", WhisperLanguages.resolve("en")); exit(0) }
 if args.contains("--test-dictionary") { exit(TextProcessor.selfTest() ? 0 : 1) }
 if args.contains("--test-mute") {
     // measured check: mute to 0, read back, restore, read back

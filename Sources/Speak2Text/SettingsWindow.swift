@@ -5,10 +5,7 @@ import Combine
 /// Modern settings window: translucent sidebar (NSSplitViewController) + grouped forms in the detail pane.
 private let settingsItems: [(id: String, title: String, symbol: String)] = [
     ("general", L("General"), "gearshape"),
-    ("model", L("Model"), "cpu"),
-    ("dictionary", L("Dictionary"), "character.book.closed"),
     ("history", L("History"), "clock.arrow.circlepath"),
-    ("permissions", L("Permissions"), "lock.shield"),
     ("about", L("About"), "info.circle")]
 
 struct SettingsSidebar: View {
@@ -27,10 +24,7 @@ struct SettingsDetail: View {
     @ObservedObject var nav = SettingsNav.shared
     var body: some View {
         switch nav.tab {
-        case "model": ModelTab()
-        case "dictionary": DictionaryTab()
         case "history": HistoryTab()
-        case "permissions": PermissionsView()
         case "about": AboutTab()
         default: GeneralTab()
         }

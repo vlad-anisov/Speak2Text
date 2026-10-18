@@ -46,8 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func statusItemClicked(_ sender: NSStatusBarButton) {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let m = NSMenu()
-            m.addItem(withTitle: L("Settings…"), action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
-            m.addItem(.separator())
+            m.addItem(withTitle: L("Settings"), action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
             m.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
             item.menu = m
             item.button?.performClick(nil)
@@ -112,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LoginItem.apply(settings.launchAtLogin)
         settings.$launchAtLogin.dropFirst().receive(on: DispatchQueue.main).sink { LoginItem.apply($0) }.store(in: &cancellables)
         let pm = PermissionsModel(); pm.refresh()
-        if !settings.onboarded || !pm.allOK { settings.onboarded = true; openSettings(tab: "permissions") }
+        if !settings.onboarded || !pm.allOK { settings.onboarded = true; openSettings(tab: "general") }
         manager.$status.receive(on: DispatchQueue.main).sink { [weak self] st in
             guard let self else { return }
             if st == .ready { if self.state == .loading { self.state = .idle } }
@@ -127,13 +126,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// `--screenshots <dir> [--lang en|ru]`: captures every settings tab (History with dummy items), then quits.
     func runScreenshots(_ dir: String) {
-        let tabs = ["general", "model", "dictionary", "history", "permissions", "about"]
-        var delay = 2.0
+        let tabs = CommandLine.arguments.contains("--fake-missing-permissions") ? ["general"] : ["general", "history", "about"]
+        var delay = 9.0
         openSettings(tab: "general")
         for t in tabs {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self.openSettings(tab: t) }
             DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.2) {
-                if let w = self.settingsWindow { captureWindow(w, to: "\(dir)/settings-\(t).png") }
+                if let w = self.settingsWindow { captureWindow(w, to: "\(dir)/settings-\(t)\(CommandLine.arguments.contains("--fake-missing-permissions") ? "-permissions" : "").png") }
             }
             delay += 2.0
         }
@@ -172,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func startRecording() {
         guard state == .idle, let engine else { return }
-        engine.language = settings.language
+        engine.language = settings.recognitionLanguage
         let s = engine.newSession()
         let r = Recorder()
         let box = SampleBox()
