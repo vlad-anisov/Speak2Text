@@ -16,8 +16,7 @@ final class Settings: ObservableObject {
     @Published var language: String { didSet { d.set(language, forKey: "recognitionLanguage") } }
     @Published var muteEnabled: Bool { didSet { d.set(muteEnabled, forKey: "muteEnabled") } }
     @Published var overlayEnabled: Bool { didSet { d.set(overlayEnabled, forKey: "overlayEnabled") } }
-    @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
-    /// Id of the start/stop sound variant (see `Sounds.variants`).
+    /// Id of the start/stop sound variant (see `Sounds.variants`) or `Sounds.none` (no sounds, no microphone gate).
     @Published var soundVariant: String { didSet { d.set(soundVariant, forKey: "soundVariant") } }
     @Published var launchAtLogin: Bool { didSet { d.set(launchAtLogin, forKey: "launchAtLogin") } }
     @Published var accelerator: Accelerator { didSet { d.set(accelerator.rawValue, forKey: "accelerator") } }
@@ -41,14 +40,21 @@ final class Settings: ObservableObject {
         for k in ["language", "replacements", "fillers", "muteLevel", "model", "promptEnabled", "promptTerms"] { d.removeObject(forKey: k) }   // keys of older versions
         muteEnabled = bool("muteEnabled", true)
         overlayEnabled = bool("overlayEnabled", true)
-        soundsEnabled = bool("soundsEnabled", true)
-        soundVariant = d.string(forKey: "soundVariant").flatMap { v in Sounds.variants.contains { $0.id == v } ? v : nil } ?? Sounds.variants[0].id
+        // Older versions had a separate on/off switch: an explicit "off" becomes "None".
+        let storedVariant = d.string(forKey: "soundVariant").flatMap { v in Sounds.variants.contains { $0.id == v } ? v : nil }
+        let sound = d.object(forKey: "soundsEnabled") as? Bool == false ? Sounds.none
+            : d.string(forKey: "soundVariant") == Sounds.none ? Sounds.none : storedVariant ?? Sounds.defaultVariant
+        soundVariant = sound
+        d.set(sound, forKey: "soundVariant")
+        d.removeObject(forKey: "soundsEnabled")
         launchAtLogin = bool("launchAtLogin", true)
         accelerator = Accelerator(rawValue: d.string(forKey: "accelerator") ?? "") ?? .ane
         fillersEnabled = bool("fillersEnabled", true)   // on unless the user switched it off explicitly
         historyEnabled = bool("historyEnabled", true)
         historyDays = d.object(forKey: "historyDays") as? Int ?? 30
     }
+
+    var soundsEnabled: Bool { soundVariant != Sounds.none }
 
     /// Language code passed to the engine: "auto" or a Whisper code. "system" is resolved here, every time.
     var recognitionLanguage: String { WhisperLanguages.resolve(language) }

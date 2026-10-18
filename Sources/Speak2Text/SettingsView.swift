@@ -68,19 +68,13 @@ struct GeneralTab: View {
                 }
             }
             Section {
-                Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
-                HStack {
-                    Text(L("Start and stop sounds"))
-                    Spacer()
-                    if s.soundsEnabled {
-                        Picker(L("Sound"), selection: $s.soundVariant) {
-                            ForEach(Sounds.variants, id: \.id) { Text(L($0.en)).tag($0.id) }
-                        }
-                        .labelsHidden().fixedSize()
-                        .onChange(of: s.soundVariant) { _, v in Sounds.preview(v) }
-                    }
-                    Toggle(L("Start and stop sounds"), isOn: $s.soundsEnabled).labelsHidden()
+                Picker(L("Sound"), selection: $s.soundVariant) {
+                    Text(L("None")).tag(Sounds.none)
+                    Divider()
+                    ForEach(Sounds.variants, id: \.id) { Text(L($0.en)).tag($0.id) }
                 }
+                .onChange(of: s.soundVariant) { _, v in Sounds.preview(v) }
+                Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
                 Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
                 Toggle(L("Remove filler words"), isOn: $s.fillersEnabled)
                 Toggle(L("Launch at login"), isOn: $s.launchAtLogin)

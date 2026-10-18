@@ -4,9 +4,13 @@ import AVFoundation
 enum Sounds {
     /// id = file prefix; names are localized in L10n.
     static let variants: [(id: String, en: String)] = [
-        ("01-classic", "Classic"), ("02-pluck", "Pluck"), ("03-marimba", "Marimba"), ("04-glass", "Glass"), ("05-wood", "Wood"),
+        ("01-classic", "Two notes"), ("02-pluck", "Pluck"), ("03-marimba", "Marimba"), ("04-glass", "Glass"), ("05-wood", "Wood"),
         ("06-chime", "Chime"), ("07-pop", "Pop"), ("08-breath", "Breath"), ("09-bell", "Bell"), ("10-tick", "Tick"),
     ]
+
+    /// Selection value for "no sounds" (also disables the microphone gate).
+    static let none = "none"
+    static let defaultVariant = "02-pluck"
 
     private static var cache: [String: AVAudioPlayer] = [:]
     private static func player(_ name: String) -> AVAudioPlayer? {
@@ -28,6 +32,7 @@ enum Sounds {
 
     /// Preview in the settings: start, then stop.
     static func preview(_ v: String) {
+        guard v != none else { return }
         playStart(v)
         let gap = startDuration(v) + 0.45
         DispatchQueue.main.asyncAfter(deadline: .now() + gap) { playStop(v) }
