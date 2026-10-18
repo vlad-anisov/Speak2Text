@@ -14,7 +14,16 @@ final class OverlayModel: ObservableObject {
 /// Non-activating capsule near the bottom of the screen with the pointer.
 /// It never becomes key and ignores the mouse, so focus stays in the app the text goes to.
 final class OverlayController {
-    static let size = NSSize(width: 220, height: 44)
+    /// Bars like on the app icon: few and chunky. Hidden setting `overlayBars` (3...16), e.g. `-overlayBars 10`.
+    static let bars: Int = {
+        let n = UserDefaults.standard.integer(forKey: "overlayBars")
+        return n == 0 ? 4 : min(max(n, 3), 16)
+    }()
+    static let barWidth: CGFloat = 6, barGap: CGFloat = 4
+    static let size: NSSize = {
+        let content = CGFloat(bars) * barWidth + CGFloat(bars - 1) * barGap
+        return NSSize(width: max(84, content + 44), height: 44)
+    }()
     let model = OverlayModel()
     private(set) var panel: NSPanel!
     private var hideWork: DispatchWorkItem?
@@ -106,7 +115,6 @@ final class WaveState {
 struct OverlayView: View {
     @ObservedObject var model: OverlayModel
     @State private var wave = WaveState()
-    private let bars = 26
 
     var body: some View {
         TimelineView(.animation) { tl in
@@ -132,32 +140,20 @@ struct OverlayView: View {
             let k: Float = target > wave.smooth ? 0.45 : 0.12
             wave.smooth += (target - wave.smooth) * k
             if target > 0.12 { wave.quietSince = nil } else if wave.quietSince == nil { wave.quietSince = date }
-            let smooth = wave.smooth
+            let smooth = Double(wave.smooth)
             let quiet = wave.quietSince.map { date.timeIntervalSince($0) > 0.8 } ?? false
-            let gap: CGFloat = 3, w = (size.width - 44 - gap * CGFloat(bars - 1)) / CGFloat(bars)
-            for i in 0..<bars {
-                let x = 22 + CGFloat(i) * (w + gap)
-                let pos = Double(i) / Double(bars - 1)
-                let env = 0.35 + 0.65 * sin(pos * .pi)
-                var h: CGFloat
-                if quiet {
-                    h = 3 + CGFloat(2.5 * (1 + sin(t * 2.2 - pos * 2.0)) * (0.5 + 0.5 * env))
-                } else {
-                    let wob = 0.55 + 0.45 * abs(sin(t * 7.0 + Double(i) * 0.9) * cos(t * 3.3 + Double(i) * 0.37))
-                    h = 3 + CGFloat(Double(smooth) * 26 * env * wob)
-                }
-                let r = CGRect(x: x, y: (size.height - h) / 2, width: w, height: h)
-                ctx.fill(Path(roundedRect: r, cornerRadius: w / 2), with: .color(fg.opacity(quiet ? 0.45 : 0.85)))
+            drawBars(ctx, size, opacity: quiet ? 0.5 : 0.9) { i, shape in
+                if quiet { return 0.14 * shape * (0.5 + 0.5 * sin(t * 2.4 - Double(i) * 0.7)) }
+                let wob = 0.6 + 0.4 * abs(sin(t * 6.5 + Double(i) * 1.7) * cos(t * 3.1 + Double(i) * 0.8))
+                return min(1, smooth * 1.6 * shape * wob)
             }
         case .processing:
-            let n = 9
-            let head = (t * 1.8).truncatingRemainder(dividingBy: 1.0) * Double(n + 4) - 2
-            for i in 0..<n {
-                let x = size.width / 2 + (CGFloat(i) - CGFloat(n - 1) / 2) * 16
-                let d = abs(Double(i) - head)
-                let a = 0.2 + 0.8 * exp(-d * d / 1.6)
-                let r: CGFloat = 3 + CGFloat(a) * 1.5
-                ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: size.height / 2 - r, width: r * 2, height: r * 2)), with: .color(fg.opacity(a)))
+            // a bump runs across the bars
+            let n = Double(OverlayController.bars)
+            let head = (t * 1.6).truncatingRemainder(dividingBy: 1.0) * (n + 2) - 1
+            drawBars(ctx, size, opacity: 0.9) { i, shape in
+                let d = Double(i) - head
+                return 0.12 + 0.5 * shape * exp(-d * d / 0.8)
             }
         case .done:
             let p = min(1, date.timeIntervalSince(model.stateSince) / 0.25)
@@ -168,6 +164,21 @@ struct OverlayView: View {
             path.addLine(to: CGPoint(x: c.x + 9, y: c.y - 7))
             ctx.stroke(path.trimmedPath(from: 0, to: CGFloat(p)), with: .color(fg),
                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+        }
+    }
+
+    /// Icon proportions: rest heights 0.54 / 1 / 0.69 like the three bars of m1, then repeated.
+    private static let shapes: [Double] = [0.54, 1.0, 0.69, 0.85, 0.62, 0.93]
+
+    /// `f(i, shape)` returns 0...1 of the free height; 0 is a round dot.
+    private func drawBars(_ ctx: GraphicsContext, _ size: CGSize, opacity: Double, _ f: (Int, Double) -> Double) {
+        let n = OverlayController.bars, w = OverlayController.barWidth, gap = OverlayController.barGap
+        let total = CGFloat(n) * w + CGFloat(n - 1) * gap
+        let x0 = (size.width - total) / 2, maxH = size.height - 14
+        for i in 0..<n {
+            let h = w + (maxH - w) * CGFloat(max(0, min(1, f(i, Self.shapes[i % Self.shapes.count]))))
+            let r = CGRect(x: x0 + CGFloat(i) * (w + gap), y: (size.height - h) / 2, width: w, height: h)
+            ctx.fill(Path(roundedRect: r, cornerRadius: w / 2), with: .color(Color.primary.opacity(opacity)))
         }
     }
 }
