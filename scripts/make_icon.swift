@@ -202,14 +202,15 @@ func iconC() -> CGImage {
     return c.makeImage()!
 }
 
-/// Template-иконка меню-бара (чёрный + альфа): 3 столбика как в m1 на сетке 18 pt; rec — ниже и с точкой записи.
+/// Template-иконка меню-бара (чёрный + альфа): 4 столбика как в оверлее (0.54/1/0.69/0.85) на сетке 18 pt,
+/// все границы на целых пикселях @1x; rec — ниже и с точкой записи.
 func menuBar(_ px: Int, rec: Bool) -> CGImage {
     let c = makeContext(px, px)
     let k = CGFloat(px) / 18
     c.scaleBy(x: k, y: k)
     c.setFillColor(col(0x000000))
-    let hs: [CGFloat] = rec ? [6, 14, 10] : [8, 16, 12]
-    let w: CGFloat = rec ? 3 : 4, pitch: CGFloat = rec ? 4 : 6, x0: CGFloat = 1
+    let hs: [CGFloat] = rec ? [6, 14, 10, 12] : [8, 16, 12, 14]
+    let w: CGFloat = 2, pitch: CGFloat = rec ? 3 : 4, x0: CGFloat = rec ? 0 : 2
     for (i, h) in hs.enumerated() {
         let r = CGRect(x: x0 + CGFloat(i) * pitch, y: (18 - h) / 2, width: w, height: h)
         c.addPath(CGPath(roundedRect: r, cornerWidth: w / 2, cornerHeight: w / 2, transform: nil)); c.fillPath()
@@ -225,11 +226,11 @@ func m1Pixel(_ px: Int) -> CGImage {
     let c = makeContext(px, px)
     c.draw(big.makeImage()!, in: CGRect(x: 0, y: 0, width: px, height: px))
     let k = CGFloat(px) / 1024
-    let w = max(1, (96 * k).rounded()), gap = max(1, (54 * k).rounded())
-    let total = 3 * w + 2 * gap
+    let w = max(1, (84 * k).rounded()), gap = max(1, (56 * k).rounded())
+    let total = 4 * w + 3 * gap
     let x0 = ((CGFloat(px) - total) / 2).rounded()
     c.setFillColor(col(0x111111))
-    for (i, h0) in ([210, 390, 270] as [CGFloat]).enumerated() {
+    for (i, h0) in ([210, 390, 270, 330] as [CGFloat]).enumerated() {
         let h = max(w, (h0 * k).rounded())
         let y = ((CGFloat(px) - h) / 2).rounded()
         let r = CGRect(x: x0 + CGFloat(i) * (w + gap), y: y, width: w, height: h)
@@ -358,7 +359,7 @@ func minIcon(_ n: Int) -> CGImage {
     let cy: CGFloat = 512
     switch n {
     case 1: // 3 столбика, чёрные на белом
-        vbars(c, [362, 512, 662], cy, 96, [210, 390, 270], ink)
+        vbars(c, [302, 442, 582, 722], cy, 84, [210, 390, 270, 330], ink)   // 4 столбика, ритм как в оверлее (0.54/1/0.69/0.85, ширина:зазор = 3:2)
     case 2: // 3 столбика + точка-курсор
         vbars(c, [307, 437, 567], cy, 80, [200, 360, 240], W)
         fp(c, CGPath(ellipseIn: CGRect(x: 707 - 50, y: cy - 50, width: 100, height: 100), transform: nil), W)
