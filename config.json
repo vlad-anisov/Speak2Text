@@ -1,0 +1,7 @@
+{
+  "_hotkey_values" : "right_option, left_option, right_command, right_control, right_shift, fn",
+  "hotkey" : "left_option",
+  "language" : "ru",
+  "live_step_s" : 1,
+  "model_folder" : "/Users/vlad/Documents/huggingface/models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3-v20240930_turbo_632MB"
+}
