@@ -3,7 +3,7 @@ import AVFoundation
 
 func runFile(_ path: String) async {
     let st = Settings.shared
-    guard let folder = ModelCatalog.folder(for: st.model) else { print("error: model \(st.model) not found"); exit(1) }
+    guard let folder = ModelCatalog.folder(for: ModelCatalog.modelID) else { print("error: model \(ModelCatalog.modelID) not found"); exit(1) }
     let engine = WhisperEngine(modelFolder: folder, accelerator: st.accelerator, language: st.language, step: st.step)
     do {
         let t = nowS()
@@ -25,6 +25,7 @@ func runFile(_ path: String) async {
         let text = normalizeText(raw)
         print(String(format: "audio=%.2fs final_wait=%.2fs", Double(samples.count) / 16000, wait))
         print("text: \(text)")
+        if let it = HistoryStore.shared.add(samples: samples, raw: text, text: TextProcessor.current(text)) { print("history item: \(it.id)") }
     } catch { print("error: \(error)") }
     exit(0)
 }
@@ -36,7 +37,7 @@ if args.contains("--test-mute") {
     let before = AudioMuter.currentVolume()
     let mu = AudioMuter()
     print("volume before: \(before.map { String($0) } ?? "n/a")")
-    mu.mute(to: 0)
+    mu.mute()
     print("volume muted: \(AudioMuter.currentVolume().map { String($0) } ?? "n/a"), state file: \(AudioMuter.hasPendingRestore)")
     if args.contains("--crash") { print("simulating crash"); kill(getpid(), SIGKILL) }
     mu.restore()

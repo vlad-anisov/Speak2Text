@@ -7,14 +7,14 @@ import Sparkle
 final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shared: AppDelegate?
     var settingsWindow: NSWindow?
-    var permWindow: NSWindow?
+    var settingsTabs: SettingsTabController?
     let updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     let overlay = OverlayController()
     let muter = AudioMuter()
     var signalSources: [DispatchSourceSignal] = []
     enum State { case loading, idle, recording, finishing }
     var item: NSStatusItem!
-    var state: State = .loading { didSet { updateIcon(); if oldValue != state { rebuildMenu() } } }
+    var state: State = .loading { didSet { updateIcon() } }
     let manager = EngineManager.shared
     let settings = Settings.shared
     var engine: WhisperEngine? { manager.engine }
@@ -40,40 +40,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey.start()
             appLog("hotkey mode: \(hotkey.mode)")
         }
-        if oldIn != inputOK || oldAX != axOK || prompt { rebuildMenu() }
     }
 
-    func rebuildMenu() {
-        let m = NSMenu()
-        if !inputOK || !axOK {
-            var miss: [String] = []
-            if !inputOK { miss.append(L("Input Monitoring")) }
-            if !axOK { miss.append(L("Accessibility")) }
-            m.addItem(withTitle: "⚠️ " + L("Missing permissions: ") + miss.joined(separator: ", "), action: nil, keyEquivalent: "")
-            if !inputOK { let i = m.addItem(withTitle: L("Input Monitoring") + "…", action: #selector(openInput), keyEquivalent: ""); i.target = self }
-            if !axOK { let i = m.addItem(withTitle: L("Accessibility") + "…", action: #selector(openAX), keyEquivalent: ""); i.target = self }
+    /// Left click opens the settings; right click shows a tiny menu with Settings and Quit.
+    @objc func statusItemClicked(_ sender: NSStatusBarButton) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            let m = NSMenu()
+            m.addItem(withTitle: L("Settings…"), action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
             m.addItem(.separator())
+            m.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
+            item.menu = m
+            item.button?.performClick(nil)
+            item.menu = nil
+        } else {
+            openSettings(tab: nil)
         }
-        let st: String
-        switch manager.status {
-        case .needsDownload: st = L("Model is not downloaded")
-        case .failed: st = L("Model failed to load")
-        case .preparing: st = L("Preparing model…")
-        case .ready: st = state == .recording ? L("Recording…") : state == .finishing ? L("Recognizing…") : L("Ready")
-        }
-        let si = m.addItem(withTitle: L("Status: ") + st, action: nil, keyEquivalent: ""); si.isEnabled = false
-        m.addItem(.separator())
-        m.addItem(withTitle: L("Permissions…"), action: #selector(openPermissions), keyEquivalent: "").target = self
-        m.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
-        let up = m.addItem(withTitle: L("Check for Updates…"), action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
-        up.target = updater
-        m.addItem(withTitle: L("Open Log"), action: #selector(openLog), keyEquivalent: "").target = self
-        m.addItem(.separator())
-        m.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
-        item.menu = m
     }
-    @objc func openInput() { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!) }
-    @objc func openAX() { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!) }
+
+    /// Accessory apps have no menu bar, so text fields would lack Cmd+C/V/X/A without an Edit menu.
+    private func installEditMenu() {
+        let main = NSMenu()
+        let appItem = NSMenuItem(); main.addItem(appItem)
+        let appMenu = NSMenu(); appItem.submenu = appMenu
+        appMenu.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
+        let editItem = NSMenuItem(); main.addItem(editItem)
+        let edit = NSMenu(title: "Edit"); editItem.submenu = edit
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        NSApp.mainMenu = main
+    }
 
     func applicationDidFinishLaunching(_ n: Notification) {
         AppDelegate.shared = self
@@ -85,9 +83,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             src.resume()
             signalSources.append(src)
         }
+        installEditMenu()
+        Sounds.prepare()
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.target = self
+        item.button?.action = #selector(statusItemClicked(_:))
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         updateIcon()
-        appLog("start: hotkey=\(settings.hotkey.displayName) model=\(settings.model) accelerator=\(settings.accelerator.rawValue)")
+        appLog("start: hotkey=\(settings.hotkey.displayName) model=\(ModelCatalog.modelID) mode=\(settings.mode) accelerator=\(settings.accelerator.rawValue)")
 
         hotkey = Hotkey()
         hotkey.onPress = { [weak self] in self?.startRecording() }
@@ -109,42 +112,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LoginItem.apply(settings.launchAtLogin)
         settings.$launchAtLogin.dropFirst().receive(on: DispatchQueue.main).sink { LoginItem.apply($0) }.store(in: &cancellables)
         let pm = PermissionsModel(); pm.refresh()
-        if !settings.onboarded || !pm.allOK { settings.onboarded = true; openPermissions() }
+        if !settings.onboarded || !pm.allOK { settings.onboarded = true; openSettings(tab: "permissions") }
         manager.$status.receive(on: DispatchQueue.main).sink { [weak self] st in
             guard let self else { return }
             if st == .ready { if self.state == .loading { self.state = .idle } }
             else if self.state == .idle { self.state = .loading }
-            self.rebuildMenu()
         }.store(in: &cancellables)
-        settings.$model.combineLatest(settings.$accelerator).dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
+        settings.$accelerator.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
             self?.manager.reload()
         }.store(in: &cancellables)
         manager.reload()
         if let i = CommandLine.arguments.firstIndex(of: "--screenshots"), i + 1 < CommandLine.arguments.count { runScreenshots(CommandLine.arguments[i + 1]) }
     }
 
-    /// `--screenshots <dir>`: captures the settings tabs and the permissions window, then quits.
+    /// `--screenshots <dir> [--lang en|ru]`: captures every settings tab (History with dummy items), then quits.
     func runScreenshots(_ dir: String) {
-        let tabs = ["general", "model", "dictionary", "about"]
+        let tabs = ["general", "model", "dictionary", "history", "permissions", "about"]
         var delay = 2.0
-        openSettings()
+        openSettings(tab: "general")
         for t in tabs {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                SettingsNav.shared.tab = t
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self.openSettings(tab: t) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.2) {
                 if let w = self.settingsWindow { captureWindow(w, to: "\(dir)/settings-\(t).png") }
             }
-            delay += 1.6
+            delay += 2.0
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            self.openPermissions()
-            self.settingsWindow?.orderOut(nil)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.5) {
-            if let w = self.permWindow { captureWindow(w, to: "\(dir)/permissions.png") }
-            NSApp.terminate(nil)
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { NSApp.terminate(nil) }
     }
 
     private func menuIcon(_ name: String) -> NSImage? {
@@ -174,28 +167,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    var audio: SampleBox?
+    var muteWork: DispatchWorkItem?
+
     func startRecording() {
         guard state == .idle, let engine else { return }
         engine.language = settings.language
-        engine.promptTokens = settings.promptEnabled ? engine.tokens(forPrompt: settings.promptTerms) : nil
         let s = engine.newSession()
         let r = Recorder()
-        r.onSamples = { [weak s] x in s?.feed(x) }
+        let box = SampleBox()
+        // The start blip is played by this process: the microphone is ignored while it sounds, so it never reaches the model or the history.
+        let blip = settings.soundsEnabled ? Sounds.startDuration + 0.04 : 0
+        let gate = nowS() + blip
+        r.onSamples = { [weak s] x in
+            if nowS() < gate { return }
+            s?.feed(x); box.append(x)
+        }
         r.onLevel = { [weak self] v in self?.overlay.setLevel(v) }
         do { try r.start() } catch { appLog("record start failed: \(error)"); return }
         s.start()
-        session = s; recorder = r; recStart = nowS()
+        session = s; recorder = r; audio = box; recStart = nowS()
         hotkey.recording = true
         if settings.overlayEnabled { overlay.show() }
-        if settings.soundsEnabled { NSSound(named: "Tink")?.play() }
-        if settings.muteEnabled { muter.mute(to: Float(settings.muteLevel) / 100) }
+        if settings.soundsEnabled { Sounds.playStart() }
+        if settings.muteEnabled {
+            // mute only after the blip, otherwise it would be silenced as well
+            let w = DispatchWorkItem { [weak self] in self?.muter.mute() }
+            muteWork = w
+            if blip > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + blip, execute: w) } else { w.perform() }
+        }
         state = .recording
     }
 
     func cancelRecording(_ reason: String) {
         guard state == .recording, let s = session, let r = recorder else { return }
-        r.stop(); recorder = nil; session = nil
+        r.stop(); recorder = nil; session = nil; audio = nil
         hotkey.recording = false
+        muteWork?.cancel(); muteWork = nil
         muter.restore()
         overlay.hide()
         s.cancel()
@@ -208,48 +216,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let tRelease = nowS()
         if !allowShort && tRelease - recStart < 0.4 { cancelRecording("short hold < 0.4s"); return }
         r.stop(); recorder = nil; session = nil
+        let box = audio; audio = nil
         hotkey.recording = false
+        muteWork?.cancel(); muteWork = nil
         muter.restore()
-        if settings.soundsEnabled { NSSound(named: "Pop")?.play() }
+        if settings.soundsEnabled { Sounds.playStop() }
         state = .finishing
         overlay.processing()
         Task {
             let dur = Double(s.totalSamples) / 16000.0
-            let raw = await s.finish()
+            let raw = normalizeText(await s.finish())
+            let text = TextProcessor.current(raw)
+            if let box { HistoryStore.shared.add(samples: box.snapshot(), raw: raw, text: text) }
             await MainActor.run {
-                let text = TextProcessor.current(normalizeText(raw))
                 if text.isEmpty { appLog("empty result, nothing inserted"); self.overlay.hide() } else { Inserter.insert(text); self.overlay.done() }
                 let wait = nowS() - tRelease
                 appLog(String(format: "audio=%.2fs final_wait=%.2fs len=%d text=%@", dur, wait, text.count, text))
                 self.state = self.manager.status == .ready ? .idle : .loading
             }
         }
-    }
-
-    @objc func openPermissions() {
-        if permWindow == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: PermissionsView()))
-            w.title = "Speak2Text"
-            w.styleMask = [.titled, .closable]
-            w.isReleasedWhenClosed = false
-            w.center()
-            permWindow = w
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        permWindow?.makeKeyAndOrderFront(nil)
-    }
-
-    @objc func openSettings() {
-        if settingsWindow == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
-            w.title = "Speak2Text"
-            w.styleMask = [.titled, .closable]
-            w.isReleasedWhenClosed = false
-            w.center()
-            settingsWindow = w
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     @objc func openLog() {

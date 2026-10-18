@@ -43,6 +43,15 @@ struct HotkeySpec: Codable, Equatable {
 
     var isCapsLock: Bool { !modifierOnly && keyCode == HotkeySpec.capsLock }
 
+    /// Label for the keycap chip in the settings, e.g. "Right ⌥", "fn", "⌃⌥K".
+    var chipLabel: String {
+        if modifierOnly, let m = HotkeySpec.modifierKeys[keyCode] {
+            if keyCode == 63 { return "fn" }
+            return (m.name.hasPrefix("Right") ? "Right " : "Left ") + m.glyph
+        }
+        return displayName
+    }
+
     var displayName: String {
         if modifierOnly { return HotkeySpec.modifierKeys[keyCode]?.name ?? "Key \(keyCode)" }
         var s = ""

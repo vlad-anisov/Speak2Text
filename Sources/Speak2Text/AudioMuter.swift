@@ -1,7 +1,7 @@
 import Foundation
 import CoreAudio
 
-/// Lowers the volume of the default output device while recording and restores it afterwards.
+/// Mutes (volume 0) the default output device while recording and restores it afterwards.
 /// The original volume is written to disk first, so a crash during recording is repaired on the next launch.
 final class AudioMuter {
     private struct Saved: Codable {
@@ -75,7 +75,8 @@ final class AudioMuter {
         return volume(dev, e)
     }
 
-    func mute(to level: Float) {
+    func mute() {
+        let level: Float = 0
         guard !active, let dev = AudioMuter.defaultOutput(), let uid = AudioMuter.uid(of: dev) else { return }
         let els = AudioMuter.volumeElements(dev)
         guard !els.isEmpty else { appLog("mute: output device has no volume control, skipped"); return }

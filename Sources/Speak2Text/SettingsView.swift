@@ -1,20 +1,28 @@
 import SwiftUI
 
+/// Selected tab id; the window controller and the views share it (e.g. to open the Permissions tab).
 final class SettingsNav: ObservableObject {
     static let shared = SettingsNav()
     @Published var tab = "general"
 }
 
-struct SettingsView: View {
-    @ObservedObject var nav = SettingsNav.shared
+// MARK: - General
+
+/// Keycap-like chip with the current hotkey; turns into "Press a key…" while recording.
+struct KeycapChip: View {
+    let text: String
+    let recording: Bool
+
     var body: some View {
-        TabView(selection: $nav.tab) {
-            GeneralTab().tabItem { Label(L("General"), systemImage: "gearshape") }.tag("general")
-            ModelTab().tabItem { Label(L("Model"), systemImage: "cpu") }.tag("model")
-            DictionaryTab().tabItem { Label(L("Dictionary"), systemImage: "text.book.closed") }.tag("dictionary")
-            AboutTab().tabItem { Label(L("About"), systemImage: "info.circle") }.tag("about")
-        }
-        .frame(width: 520, height: 440)
+        Text(text)
+            .font(.system(.body, design: .rounded).weight(.medium))
+            .foregroundStyle(recording ? Color.accentColor : Color.primary)
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .frame(minWidth: 84)
+            .background(RoundedRectangle(cornerRadius: 7).fill(recording ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(recording ? Color.accentColor : Color.secondary.opacity(0.45), lineWidth: recording ? 1.5 : 1))
+            .shadow(color: .black.opacity(0.22), radius: 0, x: 0, y: 1.5)
+            .padding(.bottom, 1.5)
     }
 }
 
@@ -25,23 +33,19 @@ struct GeneralTab: View {
     var body: some View {
         Form {
             Section {
-                HStack {
-                    Text(L("Hotkey"))
-                    Spacer()
-                    Text(capture.capturing ? L("Press a key or combination…") : s.hotkey.displayName)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(capture.capturing ? 0.3 : 0.15)))
-                    Button(capture.capturing ? L("Cancel") : L("Record")) {
-                        if capture.capturing { capture.stop(); AppDelegate.shared?.hotkey.suspended = false }
-                        else {
-                            AppDelegate.shared?.hotkey.suspended = true
-                            capture.start { spec in
-                                AppDelegate.shared?.hotkey.suspended = false
-                                if let spec { s.hotkey = spec }
-                            }
+                LabeledContent(L("Hotkey")) {
+                    HStack(spacing: 8) {
+                        Button { toggleCapture() } label: {
+                            KeycapChip(text: capture.capturing ? L("Press a key…") : s.hotkey.chipLabel, recording: capture.capturing)
                         }
+                        .buttonStyle(.plain)
+                        .help(L("Click to change. Esc cancels."))
+                        Button { s.hotkey = .default } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                            .buttonStyle(.borderless)
+                            .help(L("Reset to default"))
+                            .opacity(s.hotkey == .default || capture.capturing ? 0 : 1)
+                            .disabled(s.hotkey == .default || capture.capturing)
                     }
-                    Button(L("Reset")) { s.hotkey = .default }.disabled(capture.capturing || s.hotkey == .default)
                 }
                 if isPlainTypingKey {
                     Text(L("This key will no longer type its character while Speak2Text runs. Prefer F13, a modifier or a combination."))
@@ -49,29 +53,46 @@ struct GeneralTab: View {
                 }
                 Picker(L("Mode"), selection: $s.mode) {
                     Text(L("Hold to talk")).tag("hold")
-                    Text(L("Press to start, press to stop")).tag("toggle")
+                    Text(L("Press to start/stop")).tag("toggle")
                 }
-                Text(s.mode == "hold" ? L("Hold the key, speak, release: the text is inserted.") : L("Esc cancels the recording."))
+                Text(s.mode == "hold" ? L("Hold the key while you speak, release it to insert the text.")
+                                      : L("Press once to start, again to stop and insert the text. Esc cancels the recording."))
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
-                if s.muteEnabled {
-                    HStack {
-                        Text(L("Volume while recording"))
-                        Slider(value: Binding(get: { Double(s.muteLevel) }, set: { s.muteLevel = Int($0) }), in: 0...50, step: 5)
-                        Text("\(s.muteLevel)%").monospacedDigit().frame(width: 40, alignment: .trailing)
-                    }
-                }
-                Toggle(L("Start and stop sounds"), isOn: $s.soundsEnabled)
-                Toggle(L("Launch at login"), isOn: $s.launchAtLogin)
-                Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
                 Picker(L("Language"), selection: $s.language) {
                     Text("Русский").tag("ru")
                     Text("English").tag("en")
                     Text(L("Auto-detect")).tag("auto")
                 }
             }
+            Section {
+                Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
+                Toggle(L("Start and stop sounds"), isOn: $s.soundsEnabled)
+                Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
+                Toggle(L("Launch at login"), isOn: $s.launchAtLogin)
+            }
+            Section {
+                HStack {
+                    Spacer()
+                    Button(L("Quit Speak2Text")) { NSApp.terminate(nil) }
+                }
+            }
         }
         .formStyle(.grouped)
+        .onDisappear { stopCapture() }
+    }
+
+    private func toggleCapture() {
+        if capture.capturing { stopCapture(); return }
+        AppDelegate.shared?.hotkey.suspended = true
+        capture.start { spec in
+            AppDelegate.shared?.hotkey.suspended = false
+            if let spec { s.hotkey = spec }
+        }
+    }
+
+    private func stopCapture() {
+        if capture.capturing { capture.stop() }
+        AppDelegate.shared?.hotkey.suspended = false
     }
 
     private var isPlainTypingKey: Bool {
@@ -81,143 +102,48 @@ struct GeneralTab: View {
     }
 }
 
-/// Comma / newline separated list of terms; the text is kept locally so typing a trailing comma is not eaten.
-struct TermsEditor: View {
-    @Binding var terms: [String]
-    @State private var text = ""
-    @State private var loaded = false
-
-    var body: some View {
-        TextField("", text: $text, axis: .vertical)
-            .lineLimit(2...5)
-            .textFieldStyle(.roundedBorder)
-            .onAppear { if !loaded { text = terms.joined(separator: ", "); loaded = true } }
-            .onChange(of: text) { _, new in
-                terms = new.split(whereSeparator: { $0 == "," || $0 == "\n" }).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            }
-    }
-}
-
-struct DictionaryTab: View {
-    @ObservedObject var s = Settings.shared
-
-    var body: some View {
-        Form {
-            Section(L("Replacements")) {
-                Text(L("Applied to the final text, ignoring case, on whole words only."))
-                    .font(.caption).foregroundStyle(.secondary)
-                ForEach($s.replacements) { $r in
-                    HStack {
-                        TextField(L("Recognized as"), text: $r.from).textFieldStyle(.roundedBorder)
-                        Image(systemName: "arrow.right").foregroundStyle(.secondary)
-                        TextField(L("Replace with"), text: $r.to).textFieldStyle(.roundedBorder)
-                        Button { s.replacements.removeAll { $0.id == r.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless)
-                    }
-                }
-                Button { s.replacements.append(Replacement(from: "", to: "")) } label: { Label(L("Add"), systemImage: "plus") }
-            }
-            Section(L("Filler words")) {
-                Toggle(L("Remove filler words"), isOn: $s.fillersEnabled)
-                if s.fillersEnabled {
-                    TermsEditor(terms: $s.fillers)
-                    Text(L("Separated by commas. Removed together with the commas around them."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Section(L("Model hints")) {
-                Toggle(L("Pass terms to the model as a prompt"), isOn: $s.promptEnabled)
-                if s.promptEnabled {
-                    TermsEditor(terms: $s.promptTerms)
-                    Text(L("May skip or duplicate words (confirmed in the benchmark). Use only if names are recognized badly."))
-                        .font(.caption).foregroundStyle(.orange)
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
+// MARK: - Model
 
 struct ModelTab: View {
     @ObservedObject var s = Settings.shared
     @ObservedObject var m = EngineManager.shared
-    @StateObject private var test = SpeedTest()
-    @State private var useMic = false
-    @State private var testNote: String?
 
     var body: some View {
         Form {
             Section(L("Model")) {
-                ForEach(ModelCatalog.all) { info in modelRow(info) }
+                modelRow
                 Picker(L("Accelerator"), selection: $s.accelerator) {
                     Text("Neural Engine").tag(Accelerator.ane)
                     Text("GPU").tag(Accelerator.gpu)
                     Text("CPU").tag(Accelerator.cpu)
                 }
                 statusLine
-                Text(L("Changing the model or accelerator recompiles CoreML: the first load can take up to about 3 minutes. Do not quit the app meanwhile."))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section(L("Speed test")) {
-                Picker(L("Sample"), selection: $useMic) {
-                    Text(L("Built-in sample")).tag(false)
-                    Text(L("Microphone, 5 s")).tag(true)
-                }.pickerStyle(.segmented)
-                HStack {
-                    Button(test.running ? L("Testing…") : L("Run test")) { runTest() }
-                        .disabled(test.running || test.recordingLeft != nil || ModelCatalog.folder(for: s.model) == nil || AppDelegate.shared?.state == .recording)
-                    if let left = test.recordingLeft { Text(String(format: L("Speak now: %d s"), left)) }
-                    if let n = testNote { Text(n).foregroundStyle(.red).font(.caption) }
-                    Spacer()
-                    if let b = test.best, !test.running {
-                        Button(String(format: L("Use best: %@"), name(b))) { s.accelerator = b }.disabled(s.accelerator == b)
-                    }
-                }
-                if !test.rows.isEmpty {
-                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
-                        GridRow {
-                            Text(L("Accelerator")).bold(); Text(L("Load, s")).bold(); Text(L("Recognize, s")).bold(); Text(L("Text")).bold()
-                        }
-                        ForEach(test.rows) { r in
-                            GridRow {
-                                Text(name(r.id))
-                                Text(r.running ? "…" : r.loadS.map { String(format: "%.1f", $0) } ?? "–").monospacedDigit()
-                                Text(r.running ? "…" : r.recogS.map { String(format: "%.2f", $0) } ?? "–").monospacedDigit()
-                                Text(r.error ?? r.text).lineLimit(2).font(.caption).foregroundStyle(r.error == nil ? Color.primary : Color.red)
-                            }
-                        }
-                    }
-                }
-                Text(L("The first run on each accelerator is slow: CoreML compiles the model for it (up to a few minutes). Later runs are fast."))
+                Text(L("Changing the accelerator recompiles CoreML: the first load can take up to about 3 minutes. Do not quit the app meanwhile."))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
     }
 
-    private func name(_ a: Accelerator) -> String { a == .ane ? "Neural Engine" : a == .gpu ? "GPU" : "CPU" }
-
-    @ViewBuilder private func modelRow(_ info: ModelInfo) -> some View {
-        let have = ModelCatalog.folder(for: info.id) != nil
+    @ViewBuilder private var modelRow: some View {
+        let id = ModelCatalog.modelID
+        let have = ModelCatalog.folder(for: id) != nil
         HStack {
-            Image(systemName: s.model == info.id ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(have ? Color.accentColor : Color.secondary)
-                .onTapGesture { if have { s.model = info.id } }
             VStack(alignment: .leading) {
-                Text(info.title)
-                Text("\(info.sizeMB) MB").font(.caption).foregroundStyle(.secondary)
+                Text(ModelCatalog.title)
+                Text("\(ModelCatalog.sizeMB) MB").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if let p = m.downloads[info.id] {
+            if let p = m.downloads[id] {
                 ProgressView(value: p).frame(width: 90)
                 Text("\(Int(p * 100))%").monospacedDigit().font(.caption)
             } else if have {
-                Text(L("Downloaded")).font(.caption).foregroundStyle(.secondary)
+                Label(L("Downloaded"), systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green)
             } else {
-                if let e = m.downloadErrors[info.id] { Text(e).font(.caption).foregroundStyle(.red).lineLimit(1) }
-                Button(L("Download")) { m.download(info.id) }
+                if let e = m.downloadErrors[id] { Text(e).font(.caption).foregroundStyle(.red).lineLimit(1) }
+                Button(L("Download")) { m.download() }
             }
         }
-        .contentShape(Rectangle())
     }
 
     @ViewBuilder private var statusLine: some View {
@@ -238,21 +164,195 @@ struct ModelTab: View {
             Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(.red).lineLimit(3)
         }
     }
+}
 
-    private func runTest() {
-        testNote = nil
-        guard let folder = ModelCatalog.folder(for: s.model) else { return }
-        let lang = s.language
-        if useMic {
-            test.recordSample { samples in
-                guard let samples, samples.count > 16000 else { testNote = L("No audio from the microphone"); return }
-                test.run(samples: samples, modelFolder: folder, language: lang)
+// MARK: - Dictionary
+
+/// Comma / newline separated list of terms; the text is kept locally so typing a trailing comma is not eaten.
+struct TermsEditor: View {
+    @Binding var terms: [String]
+    @State private var text = ""
+    @State private var loaded = false
+
+    var body: some View {
+        TextField("", text: $text, axis: .vertical)
+            .lineLimit(2...5)
+            .textFieldStyle(.roundedBorder)
+            .multilineTextAlignment(.leading)
+            .onAppear { if !loaded { text = terms.joined(separator: ", "); loaded = true } }
+            .onChange(of: text) { _, new in
+                terms = new.split(whereSeparator: { $0 == "," || $0 == "\n" }).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             }
-        } else if let samples = SpeedTest.builtInSample() {
-            test.run(samples: samples, modelFolder: folder, language: lang)
-        } else { testNote = L("Built-in sample not found") }
     }
 }
+
+struct DictionaryTab: View {
+    @ObservedObject var s = Settings.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Text(L("Fix words the model gets wrong and cut filler words. Applied to every dictation before the text is inserted."))
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Section(L("Replacements")) {
+                if !s.replacements.isEmpty {
+                    HStack(spacing: 8) {
+                        Text(L("Heard")).frame(maxWidth: .infinity, alignment: .leading)
+                        Color.clear.frame(width: 14)
+                        Text(L("Write")).frame(maxWidth: .infinity, alignment: .leading)
+                        Color.clear.frame(width: 18)
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach($s.replacements) { $r in
+                    HStack(spacing: 8) {
+                        TextField("", text: $r.from).textFieldStyle(.roundedBorder).multilineTextAlignment(.leading).frame(maxWidth: .infinity)
+                        Image(systemName: "arrow.right").foregroundStyle(.secondary).frame(width: 14)
+                        TextField("", text: $r.to).textFieldStyle(.roundedBorder).multilineTextAlignment(.leading).frame(maxWidth: .infinity)
+                        Button { s.replacements.removeAll { $0.id == r.id } } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless)
+                    }
+                    .labelsHidden()
+                }
+                Button { s.replacements.append(Replacement(from: "", to: "")) } label: { Label(L("Add"), systemImage: "plus") }
+                Text(L("Applied to the final text, ignoring case, on whole words only."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section(L("Filler words")) {
+                Toggle(L("Remove filler words"), isOn: $s.fillersEnabled)
+                if s.fillersEnabled {
+                    TermsEditor(terms: $s.fillers).labelsHidden()
+                    Text(L("Separated by commas. Removed together with the commas around them."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - History
+
+struct HistoryTab: View {
+    @ObservedObject var s = Settings.shared
+    @ObservedObject var h = HistoryStore.shared
+    @ObservedObject var engine = EngineManager.shared
+    @State private var query = ""
+    @State private var confirmClear = false
+
+    private var filtered: [HistoryItem] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return h.items }
+        return h.items.filter { $0.text.localizedCaseInsensitiveContains(q) || $0.raw.localizedCaseInsensitiveContains(q) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(L("Search"), text: $query).textFieldStyle(.plain)
+                if !query.isEmpty {
+                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.borderless)
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
+            .padding([.horizontal, .top], 16).padding(.bottom, 10)
+
+            if filtered.isEmpty {
+                Spacer()
+                Text(h.items.isEmpty ? L("No dictations yet") : L("Nothing found")).foregroundStyle(.secondary)
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(filtered) { it in HistoryRow(item: it, h: h, engineReady: engine.status == .ready) }
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 8)
+                }
+            }
+
+            Divider()
+            HStack {
+                Toggle(L("Save history"), isOn: $s.historyEnabled)
+                Spacer()
+                Picker(L("Keep"), selection: $s.historyDays) {
+                    Text(L("Forever")).tag(0)
+                    Text(L("30 days")).tag(30)
+                    Text(L("7 days")).tag(7)
+                    Text(L("1 day")).tag(1)
+                }
+                .fixedSize()
+                Button(L("Clear history")) { confirmClear = true }.disabled(h.items.isEmpty)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+        }
+        .alert(L("Clear the whole history?"), isPresented: $confirmClear) {
+            Button(L("Clear"), role: .destructive) { h.clear() }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("All saved texts and recordings will be deleted. This cannot be undone."))
+        }
+        .onChange(of: s.historyDays) { _, _ in h.prune() }
+        .onDisappear { h.stopPlayback() }
+    }
+}
+
+struct HistoryRow: View {
+    let item: HistoryItem
+    @ObservedObject var h: HistoryStore
+    let engineReady: Bool
+
+    private var durationText: String {
+        let t = Int(item.duration.rounded())
+        return String(format: "%d:%02d", t / 60, t % 60)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text(item.date.formatted(date: .abbreviated, time: .shortened))
+                Text("·")
+                Text(durationText).monospacedDigit()
+                Spacer()
+            }
+            .font(.caption).foregroundStyle(.secondary)
+            if item.text.isEmpty {
+                Text(L("No text recognized")).italic().foregroundStyle(.secondary)
+            } else {
+                Text(item.text).lineLimit(3).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !item.raw.isEmpty && item.raw != item.text {
+                Text(L("Raw: ") + item.raw).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            HStack(spacing: 14) {
+                action("doc.on.doc", L("Copy text"), enabled: !item.text.isEmpty) { h.copy(item) }
+                action(h.playingID == item.id ? "stop.fill" : "play.fill", L("Play / stop audio"), enabled: item.hasAudio) { h.togglePlayback(item) }
+                action("arrow.turn.down.left", L("Paste again"), enabled: !item.text.isEmpty) { h.pasteAgain(item) }
+                if h.busy.contains(item.id) {
+                    ProgressView().controlSize(.small).frame(width: 16)
+                } else {
+                    action("arrow.clockwise", L("Re-transcribe"), enabled: item.hasAudio && engineReady) { h.retranscribe(item) }
+                }
+                action("folder", L("Show in Finder"), enabled: true) { h.reveal(item) }
+                Spacer()
+                action("trash", L("Delete"), enabled: true) { h.remove(item) }
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.2)))
+    }
+
+    private func action(_ symbol: String, _ help: String, enabled: Bool, _ run: @escaping () -> Void) -> some View {
+        Button(action: run) { Image(systemName: symbol).frame(width: 16, height: 16) }
+            .buttonStyle(.borderless)
+            .help(help)
+            .disabled(!enabled)
+    }
+}
+
+// MARK: - About
 
 struct AboutTab: View {
     var body: some View {
@@ -262,11 +362,15 @@ struct AboutTab: View {
             Text(String(format: L("Version %@"), Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"))
                 .foregroundStyle(.secondary)
             Text(L("Local push-to-talk dictation. Nothing leaves your Mac.")).font(.callout)
-            Button(L("Check for Updates…")) { AppDelegate.shared?.updater.checkForUpdates(nil) }
+            HStack {
+                Button(L("Check for Updates…")) { AppDelegate.shared?.updater.checkForUpdates(nil) }
+                Button(L("Open Log")) { AppDelegate.shared?.openLog() }
+            }
+            .padding(.top, 4)
             Link("github.com/vlad-anisov/Speak2Text", destination: URL(string: "https://github.com/vlad-anisov/Speak2Text")!)
             Spacer()
         }
-        .padding(.top, 24)
+        .padding(.top, 28)
         .frame(maxWidth: .infinity)
     }
 }

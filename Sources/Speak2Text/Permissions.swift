@@ -69,27 +69,31 @@ struct PermissionsView: View {
     @StateObject private var m = PermissionsModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(L("Speak2Text needs three permissions")).font(.title3.bold())
-            row(L("Microphone"), L("to record your voice"), m.mic, m.openMic)
-            row(L("Input Monitoring"), L("to see the hotkey"), m.input, m.openInput)
-            row(L("Accessibility"), L("to paste the text with Cmd+V"), m.ax, m.openAX)
-            if !m.allOK {
-                Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again."))
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(L("If the app is already in the list, remove it with the − button and add it again."))
-                    .font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    Text(L("Granted but still showing ✗? The app must be restarted.")).font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button(L("Restart")) { Permissions.relaunch() }
+        Form {
+            Section {
+                row(L("Microphone"), L("to record your voice"), m.mic, m.openMic)
+                row(L("Input Monitoring"), L("to see the hotkey"), m.input, m.openInput)
+                row(L("Accessibility"), L("to paste the text with Cmd+V"), m.ax, m.openAX)
+            } header: {
+                Text(L("Speak2Text needs three permissions"))
+            }
+            Section {
+                if !m.allOK {
+                    Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again."))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text(L("If the app is already in the list, remove it with the − button and add it again."))
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Text(L("Granted but still showing ✗? The app must be restarted.")).font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button(L("Restart")) { Permissions.relaunch() }
+                    }
+                } else {
+                    Label(L("All set. You can close this window."), systemImage: "checkmark.seal").foregroundStyle(.green)
                 }
-            } else {
-                Label(L("All set. You can close this window."), systemImage: "checkmark.seal").foregroundStyle(.green)
             }
         }
-        .padding(20)
-        .frame(width: 460)
+        .formStyle(.grouped)
         .onAppear { m.startPolling() }
         .onDisappear { m.stopPolling() }
     }
