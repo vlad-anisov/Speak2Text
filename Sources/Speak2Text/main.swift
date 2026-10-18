@@ -52,6 +52,7 @@ if args.contains("--test-mute-recover") {
 }
 if let i = args.firstIndex(of: "--demo-overlay") {
     let app = NSApplication.shared
+    if args.contains("--light") { app.appearance = NSAppearance(named: .aqua) }
     app.setActivationPolicy(.accessory)
     let d = OverlayDemo(dir: i + 1 < args.count ? args[i + 1] : nil)
     app.delegate = d
@@ -61,6 +62,7 @@ if let i = args.firstIndex(of: "--demo-overlay") {
     dispatchMain()
 } else {
     let app = NSApplication.shared
+    if args.contains("--light") { app.appearance = NSAppearance(named: .aqua) }   // screenshots only
     app.setActivationPolicy(.accessory)
     let d = AppDelegate()
     app.delegate = d

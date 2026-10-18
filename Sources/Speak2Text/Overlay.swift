@@ -109,7 +109,6 @@ final class OverlayPanel: NSPanel {
 
 final class WaveState {
     var smooth: Float = 0
-    var quietSince: Date?
 }
 
 struct OverlayView: View {
@@ -136,14 +135,14 @@ struct OverlayView: View {
             // RMS -> 0...1 on a dB scale, then attack/release smoothing
             let raw = model.level
             let db = 20 * log10(max(raw, 1e-5))
-            let target = Float(min(max((db + 52) / 40, 0), 1))
+            var target = Float(min(max((db + 52) / 40, 0), 1))
+            if target <= 0.12 { target = 0 }   // quiet: bars settle back to static round dots
             let k: Float = target > wave.smooth ? 0.45 : 0.12
             wave.smooth += (target - wave.smooth) * k
-            if target > 0.12 { wave.quietSince = nil } else if wave.quietSince == nil { wave.quietSince = date }
+            if wave.smooth < 0.01 { wave.smooth = 0 }
             let smooth = Double(wave.smooth)
-            let quiet = wave.quietSince.map { date.timeIntervalSince($0) > 0.8 } ?? false
-            drawBars(ctx, size, opacity: quiet ? 0.5 : 0.9) { i, shape in
-                if quiet { return 0.14 * shape * (0.5 + 0.5 * sin(t * 2.4 - Double(i) * 0.7)) }
+            drawBars(ctx, size, opacity: 1) { i, shape in
+                if smooth == 0 { return 0 }
                 let wob = 0.6 + 0.4 * abs(sin(t * 6.5 + Double(i) * 1.7) * cos(t * 3.1 + Double(i) * 0.8))
                 return min(1, smooth * 1.6 * shape * wob)
             }
@@ -151,7 +150,7 @@ struct OverlayView: View {
             // a bump runs across the bars
             let n = Double(OverlayController.bars)
             let head = (t * 1.6).truncatingRemainder(dividingBy: 1.0) * (n + 2) - 1
-            drawBars(ctx, size, opacity: 0.9) { i, shape in
+            drawBars(ctx, size, opacity: 1) { i, shape in
                 let d = Double(i) - head
                 return 0.12 + 0.5 * shape * exp(-d * d / 0.8)
             }
