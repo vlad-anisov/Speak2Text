@@ -1,39 +1,26 @@
 import Foundation
 
-/// Post-processing of the final text: user replacements, then filler words.
+/// Post-processing of the final text: built-in replacements (always on), then filler words (optional).
 enum TextProcessor {
     private static let wordChar = "[\\p{L}\\p{N}_]"
 
-    private static func phrasePattern(_ s: String) -> String {
-        s.split(whereSeparator: { $0.isWhitespace }).map { NSRegularExpression.escapedPattern(for: String($0)) }.joined(separator: "\\s+")
-    }
+    /// Always removed when they stand alone as a word.
+    static let strongFillers = ["э", "ээ", "эээ", "эм", "ээм", "um", "umm", "uh", "uhh"]
+    /// Real words too, so they are removed only when followed by a comma ("Ну, давай", "Это, как бы, важно").
+    static let weakFillers = ["ну", "типа", "как бы", "короче", "вот"]
 
-    static func process(_ text: String, replacements: [Replacement], fillers: [String]?) -> String {
-        var t = text
-        if let f = fillers { t = removeFillers(t, fillers: f) }
-        t = applyReplacements(t, replacements)
+    static func process(_ text: String, fillers: Bool) -> String {
+        var t = BuiltinDictionary.apply(text)
+        if fillers { t = removeFillers(t) }
         return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func applyReplacements(_ text: String, _ list: [Replacement]) -> String {
-        var t = text
-        for r in list {
-            let from = r.from.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !from.isEmpty,
-                  let re = try? NSRegularExpression(pattern: "(?<!\(wordChar))\(phrasePattern(from))(?!\(wordChar))", options: [.caseInsensitive])
-            else { continue }
-            t = re.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: NSRegularExpression.escapedTemplate(for: r.to))
-        }
-        return t
-    }
-
     /// Removes filler words together with the commas around them; keeps the next word capitalised when the filler opened a sentence.
-    static func removeFillers(_ text: String, fillers: [String]) -> String {
-        let words = fillers.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-            .sorted { $0.count > $1.count }.map(phrasePattern)
-        guard !words.isEmpty,
-              let re = try? NSRegularExpression(pattern: "(,\\s*)?(?<!\(wordChar))(?:\(words.joined(separator: "|")))(?!\(wordChar))(\\s*,)?", options: [.caseInsensitive])
-        else { return text }
+    static func removeFillers(_ text: String) -> String {
+        func alt(_ l: [String]) -> String { l.sorted { $0.count > $1.count }.map { $0.replacingOccurrences(of: " ", with: "\\s+") }.joined(separator: "|") }
+        let strong = alt(strongFillers), weak = alt(weakFillers)
+        let word = "(?<!\(wordChar))(?:\(strong)|(?<!и\\s)(?:\(weak))(?=\\s*,))(?!\(wordChar))"
+        guard let re = try? NSRegularExpression(pattern: "(,\\s*)?\(word)(\\s*,)?", options: [.caseInsensitive]) else { return text }
         var t = text
         for m in re.matches(in: t, range: NSRange(t.startIndex..., in: t)).reversed() {
             guard let r = Range(m.range, in: t) else { continue }
@@ -56,26 +43,58 @@ enum TextProcessor {
         return t
     }
 
-    static func current(_ text: String) -> String {
-        let s = Settings.shared
-        return process(text, replacements: s.replacements, fillers: s.fillersEnabled ? s.fillers : nil)
-    }
+    static func current(_ text: String) -> String { process(text, fillers: Settings.shared.fillersEnabled) }
 
-    /// Self-check used by `--test-dictionary`.
+    /// Self-check used by `--test-dictionary`: (input, fillers on?, expected output).
     static func selfTest() -> Bool {
-        let rep = [Replacement(from: "пайплайн", to: "pipeline"), Replacement(from: "гит хаб", to: "GitHub")]
-        let fil = Settings.defaultFillers
-        let cases: [(String, String)] = [
-            (process("Настроил Пайплайн и пайплайны, на гит хабе", replacements: rep, fillers: nil), "Настроил pipeline и пайплайны, на гит хабе"),
-            (process("Залил в Гит  Хаб", replacements: rep, fillers: nil), "Залил в GitHub"),
-            (process("Ну, давай начнём", replacements: [], fillers: fil), "Давай начнём"),
-            (process("Это, как бы, очень важно", replacements: [], fillers: fil), "Это, очень важно"),
-            (process("Мы э сделали типа всё", replacements: [], fillers: fil), "Мы сделали всё"),
-            (process("Он вышел. Короткий вопрос, ээ, есть", replacements: [], fillers: fil), "Он вышел. Короткий вопрос, есть"),
-            (process("Намного лучше, нужно эхо", replacements: [], fillers: fil), "Намного лучше, нужно эхо"),
+        let cases: [(String, Bool, String)] = [
+            // replacements: must change
+            ("Настроил пайплайн и залил в гитхаб", false, "Настроил pipeline и залил в GitHub"),
+            ("Выложил на гитхабе", false, "Выложил на GitHub"),
+            ("Сделай гит пуш в мастер", false, "Сделай git push в мастер"),
+            ("Открой пулл реквест в Джире", false, "Открой pull request в Jira"),
+            ("Создал мёрдж реквест", false, "Создал merge request"),
+            ("Фронтенд и бэкенд готовы", false, "Frontend и backend готовы"),
+            ("Деплой прошёл успешно", false, "Deploy прошёл успешно"),
+            ("Подними докер и кубернетес", false, "Подними Docker и Kubernetes"),
+            ("Пишу на питоне и тайпскрипт", false, "Пишу на Python и TypeScript"),
+            ("Сделал новый эндпоинт для апи", false, "Сделал новый endpoint для API"),
+            ("Работаю в сфере ай-ти", false, "Работаю в сфере IT"),
+            ("Написал в слак и телеграм, потом зум", false, "Написал в Slack и Telegram, потом Zoom"),
+            ("Открой гугл докс и эксель", false, "Открой Google Docs и Excel"),
+            ("Заметки в ноушн", false, "Заметки в Notion"),
+            ("Спроси у чатджипити и клод", false, "Спроси у ChatGPT и Claude"),
+            ("Приложение для иос и макос", false, "Приложение для iOS и macOS"),
+            ("Модуль в оду", false, "Модуль в Odoo"),
+            ("Настроил сиай", false, "Настроил CI"),
+            ("Запустил два пайплайна", false, "Запустил два pipeline"),
+            ("Чинил пайплайны всю неделю", false, "Чинил pipelines всю неделю"),
+            // replacements: must NOT change
+            ("Это баг, а не фича, поправь код", false, "Это баг, а не фича, поправь код"),
+            ("Сыграй на гитаре, гита здесь ни при чём", false, "Сыграй на гитаре, гита здесь ни при чём"),
+            ("Докеры разгрузили порт", false, "Докеры разгрузили порт"),
+            ("Пайплайнер ничего не знает про зумеры", false, "Пайплайнер ничего не знает про зумеры"),
+            ("Выпил кофе в кафе и пошёл дальше", false, "Выпил кофе в кафе и пошёл дальше"),
+            ("Мы работаем с зумом ежедневно", false, "Мы работаем с Zoom ежедневно"),
+            // fillers
+            ("Ну, давай начнём", true, "Давай начнём"),
+            ("Это, как бы, очень важно", true, "Это, очень важно"),
+            ("Мы э сделали, типа, всё", true, "Мы сделали, всё"),
+            ("Он вышел. Короче, вопрос есть", true, "Он вышел. Вопрос есть"),
+            ("I um think uh this works", true, "I think this works"),
+            // fillers: must NOT change
+            ("Определение типа данных", true, "Определение типа данных"),
+            ("Ну и ну, как бы вы поступили?", true, "Ну и ну, как бы вы поступили?"),
+            ("Вот это да, стал короче", true, "Вот это да, стал короче"),
+            ("Намного лучше, нужно эхо", true, "Намного лучше, нужно эхо"),
+            ("Ну, давай", false, "Ну, давай"),
         ]
         var ok = true
-        for (got, want) in cases { let p = got == want; ok = ok && p; print(p ? "PASS" : "FAIL", "'\(got)'", p ? "" : "expected '\(want)'") }
+        for (inp, f, want) in cases {
+            let got = process(inp, fillers: f)
+            let p = got == want; ok = ok && p
+            print(p ? "PASS" : "FAIL", "'\(inp)' ->", "'\(got)'", p ? "" : "expected '\(want)'")
+        }
         return ok
     }
 }
