@@ -118,11 +118,6 @@ final class HistoryStore: NSObject, ObservableObject, AVAudioPlayerDelegate {
         NSPasteboard.general.setString(it.text, forType: .string)
     }
 
-    func reveal(_ it: HistoryItem) {
-        let url = it.hasAudio ? HistoryStore.audioURL(it) : HistoryStore.jsonURL(it.id)
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
-
     func togglePlayback(_ it: HistoryItem) {
         if playingID == it.id { stopPlayback(); return }
         stopPlayback()
@@ -136,15 +131,6 @@ final class HistoryStore: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         DispatchQueue.main.async { self.player = nil; self.playingID = nil }
-    }
-
-    /// Hides the settings window so focus returns to the previous app, then pastes the text at the cursor.
-    func pasteAgain(_ it: HistoryItem) {
-        guard !it.text.isEmpty else { return }
-        stopPlayback()
-        AppDelegate.shared?.settingsWindow?.orderOut(nil)
-        NSApp.hide(nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { Inserter.insert(it.text) }
     }
 
     /// Runs the current engine on the saved audio and updates the item.

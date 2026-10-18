@@ -47,7 +47,7 @@ struct HotkeySpec: Codable, Equatable {
     var chipLabel: String {
         if modifierOnly, let m = HotkeySpec.modifierKeys[keyCode] {
             if keyCode == 63 { return "fn" }
-            return (m.name.hasPrefix("Right") ? "Right " : "Left ") + m.glyph
+            return (m.name.hasPrefix("Right") ? L("Right") : L("Left")) + " " + m.glyph
         }
         return displayName
     }

@@ -34,7 +34,7 @@ final class Settings: ObservableObject {
     private init() {
         func bool(_ k: String, _ def: Bool) -> Bool { UserDefaults.standard.object(forKey: k) as? Bool ?? def }
         let d = UserDefaults.standard
-        hotkey = (d.data(forKey: "hotkey").flatMap { try? JSONDecoder().decode(HotkeySpec.self, from: $0) }) ?? .default
+        hotkey = CommandLine.arguments.contains("--screenshots") ? .default : (d.data(forKey: "hotkey").flatMap { try? JSONDecoder().decode(HotkeySpec.self, from: $0) }) ?? .default
         mode = d.string(forKey: "mode") ?? "toggle"
         language = d.string(forKey: "recognitionLanguage") ?? "system"
         for k in ["language", "replacements", "fillers", "muteLevel", "model", "promptEnabled", "promptTerms"] { d.removeObject(forKey: k) }   // keys of older versions

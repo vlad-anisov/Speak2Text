@@ -63,12 +63,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu(); appItem.submenu = appMenu
         appMenu.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
         let editItem = NSMenuItem(); main.addItem(editItem)
-        let edit = NSMenu(title: "Edit"); editItem.submenu = edit
-        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let edit = NSMenu(title: L("Edit")); editItem.submenu = edit
+        edit.addItem(withTitle: L("Undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: L("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: L("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: L("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: L("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         NSApp.mainMenu = main
     }
 

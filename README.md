@@ -6,71 +6,74 @@
 
 **Local push-to-talk dictation for macOS. Press a key, speak, get text.**
 
+### [⬇ Download for Mac](https://github.com/vlad-anisov/Speak2Text/releases/latest/download/Speak2Text.dmg)
+
+macOS 14+ · Apple Silicon · free · MIT
+
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/vlad-anisov/Speak2Text)](https://github.com/vlad-anisov/Speak2Text/releases/latest)
 
-<img src="docs/screenshots/settings-general.png" width="640" alt="Speak2Text settings">
-
-<img src="docs/screenshots/overlay-listening.png" height="60" alt="Overlay while listening">
-&nbsp;
-<img src="docs/screenshots/overlay-done.png" height="60" alt="Overlay when done">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-general.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-general.png">
+  <img src="docs/screenshots/settings-general.png" width="640" alt="Speak2Text settings">
+</picture>
 
 </div>
 
-Press a hotkey, speak, press it again (or hold it and release): the text is typed into the app you were using. Recognition runs fully on your Mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Core ML). Speak2Text is a menu bar app with no Dock icon; click the icon to open the settings.
+Press a key, say what you want to write, press it again: the text appears in the app you were using. Recognition runs fully on your Mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Core ML), nothing is sent anywhere. Speak2Text lives in the menu bar (no Dock icon); click its icon to open the settings.
 
 ## Features
 
-- On-device [WhisperKit](https://github.com/argmaxinc/WhisperKit) turbo model (large-v3 turbo, 632 MB) on the Neural Engine
-- Live mode: partial results while you talk, final text about 1 s after you stop
-- Any hotkey (single left/right modifier, any key, or a combo), toggle or hold-to-talk mode
-- Animated pill overlay showing the state
-- Mutes other audio while recording and restores it afterwards
-- Built-in fixes for English tech terms that Whisper writes in Cyrillic (GitHub, pipeline, Jira, ...) and optional filler-word removal
-- History with saved audio, search, copy, paste again and re-transcribe
-- Auto-updates via [Sparkle](https://sparkle-project.org)
-- English and Russian UI (follows macOS); all Whisper languages for recognition
+- Works offline: on-device Whisper large-v3 turbo model (632 MB) on the Neural Engine
+- Live mode: partial results while you talk, final text about 0.6-1.05 s after you stop (measured)
+- Any hotkey: a single left/right modifier, any key or a combination; press-to-toggle or hold-to-talk
+- Small pill on screen shows the state: listening, processing, done
+- 10 start/stop sounds to choose from (or none); other audio is muted while you record
+- Fixes English tech terms that Whisper writes in Cyrillic (GitHub, pipeline, Jira, ...); filler words ("um", "ну") are removed by default
+- History of dictations with saved audio: search, copy, listen, re-transcribe, delete
+- Menu-bar icon, launch at login, automatic updates ([Sparkle](https://sparkle-project.org))
+- English and Russian interface (follows macOS); all Whisper languages for recognition
 
 ## Install
 
-1. Download `Speak2Text-<version>.dmg` from [Releases](https://github.com/vlad-anisov/Speak2Text/releases/latest), open it and drag `Speak2Text.app` onto the Applications folder.
-2. **First launch.** The app is signed with a development certificate and is **not notarized**, so macOS will block it the first time. Do one of:
-   - Right-click `Speak2Text.app` and choose **Open**, then confirm; or
-   - open **System Settings → Privacy & Security** and click **Open Anyway**; or
-   - run in Terminal:
-     ```sh
-     xattr -dr com.apple.quarantine /Applications/Speak2Text.app
-     ```
-3. Grant the permissions in the "Permissions needed" block at the top of General (Settings open there on first run; the block disappears once everything is granted):
-   - **Microphone** to record speech
-   - **Input Monitoring** to see the global hotkey
-   - **Accessibility** to paste the text (Cmd+V) into the active app
-4. Wait for the model (status under Accelerator). The first launch downloads it and compiles Core ML for the Neural Engine, which takes a few minutes (up to ~3 minutes for the compile). Later launches take a few seconds. Do not quit the app meanwhile.
+1. **[Download Speak2Text.dmg](https://github.com/vlad-anisov/Speak2Text/releases/latest/download/Speak2Text.dmg)**, open it and drag **Speak2Text** onto **Applications**.
 
-Requires macOS 14+ on Apple Silicon.
+   <img src="docs/screenshots/dmg-install.png" width="460" alt="Drag Speak2Text to Applications">
 
-## Usage
+2. Open Speak2Text from Applications. The first time macOS says it cannot verify the app (it is not notarized): open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+3. Allow the three permissions listed at the top of the settings window. The block disappears when everything is granted.
 
-- The default hotkey is **Right Option**. Change it in Settings → General: click the key chip and press any key, modifier or combo (Esc cancels, ⓧ resets).
-- Default mode is **Press**: press to start, press again to stop (Esc cancels). Switch to **Hold** to talk only while the key is down.
-- Language: "Same as system" (default, falls back to auto-detect for unsupported languages), "Auto-detect" or any Whisper language. Start/stop sounds, overlay, filler-word removal and launch at login are in Settings → General.
-- Right-click the menu bar icon for Settings and Quit.
-- Text is delivered through the clipboard (Cmd+V) and your previous clipboard contents are restored right after pasting.
-- In tests the final text appeared about 0.6-1.05 s after stop.
-- History is stored in `~/Library/Application Support/Speak2Text/History/` (audio as 16 kHz mono wav); keep it forever, 30 days (default), 7, 1, or turn it off.
-- Log: `~/Library/Logs/Speak2Text/speak2text.log`.
+   <picture>
+     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-general-permissions.png">
+     <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-general-permissions.png">
+     <img src="docs/screenshots/settings-general-permissions.png" width="520" alt="Permissions needed block">
+   </picture>
 
-<p align="center">
-<img src="docs/screenshots/settings-history.png" width="560" alt="History">
-</p>
+   - **Microphone**: to record your voice
+   - **Input Monitoring**: to see the hotkey
+   - **Accessibility**: to paste the text into the active app
+4. Wait until the status next to **Accelerator** says **Ready**. The first launch downloads the model and prepares it for the Neural Engine, which takes a few minutes; later launches take seconds. Keep the app running meanwhile.
 
-## Privacy
+That's it: press **Right Option**, speak, press it again.
 
-Nothing leaves your Mac. Speech recognition, history and settings are all local. The model is downloaded once from Hugging Face by WhisperKit; the only other network use is Sparkle checking for updates.
+<details>
+<summary>For developers and advanced users</summary>
 
-## Build from source
+### Skip the Gatekeeper dialog from Terminal
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Speak2Text.app
+```
+
+### Files
+
+- History: `~/Library/Application Support/Speak2Text/History/` (`<id>.json` plus audio as 16 kHz mono wav)
+- Log: `~/Library/Logs/Speak2Text/speak2text.log`
+
+### Build from source
 
 Only the Xcode Command Line Tools are needed (Swift 6.1+).
 
@@ -88,9 +91,68 @@ Speak2Text --file sample.wav     # prints the text and final_wait (delay after t
 
 Regenerate the start/stop sounds with `python3 scripts/make_sounds.py`. See [docs/SPEC.md](docs/SPEC.md) for the detailed spec.
 
-## Releasing
+### Releasing
 
-`scripts/release.sh <version>` builds, zips into `dist/`, generates a signed Sparkle `appcast.xml` and a drag-to-Applications `Speak2Text-<version>.dmg` (via [dmgbuild](https://github.com/dmgbuild/dmgbuild), installed into a venv under `.build/`). It publishes nothing: create the release `v<version>` on GitHub and attach the `.dmg` (for people), the `.zip` (for Sparkle updates) and `dist/appcast.xml`. Signing keys come from Sparkle `generate_keys` (private key in your Keychain, public key in `Info.plist` as `SUPublicEDKey`).
+`scripts/release.sh <version>` builds, zips into `dist/`, generates a signed Sparkle `appcast.xml` and a drag-to-Applications `Speak2Text-<version>.dmg` (plus an unversioned copy `Speak2Text.dmg`, which the Download link below points to) (via [dmgbuild](https://github.com/dmgbuild/dmgbuild), installed into a venv under `.build/`). It publishes nothing: create the release `v<version>` on GitHub and attach both `.dmg` files (for people), the `.zip` and `.delta` files (for Sparkle updates) and `dist/appcast.xml`. Signing keys come from Sparkle `generate_keys` (private key in your Keychain, public key in `Info.plist` as `SUPublicEDKey`).
+
+</details>
+
+## Usage
+
+- The default hotkey is **Right Option**. Change it in Settings → General: click the key chip and press any key, modifier or combination (Esc cancels, ⓧ resets).
+- Default mode is **Press**: press to start, press again to stop (Esc cancels). **Hold** records only while the key is down.
+- Language: "Same as system" (default; falls back to auto-detect if the system language is not supported), "Auto-detect" or any Whisper language.
+- Right-click the menu bar icon for Settings and Quit.
+- The text is pasted with Cmd+V; your previous clipboard contents are restored right after.
+- History keeps dictations forever, 30 days (default), 7 days or 1 day, or can be turned off. Click an entry to see the full text and copy it, listen to the recording, re-transcribe it or delete it.
+
+## Screenshots
+
+<table align="center">
+<tr>
+<td align="center"><b>History</b><br>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-history.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-history.png">
+  <img src="docs/screenshots/settings-history.png" width="400" alt="History">
+</picture></td>
+<td align="center"><b>About</b><br>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-about.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-about.png">
+  <img src="docs/screenshots/settings-about.png" width="400" alt="About">
+</picture></td>
+</tr>
+</table>
+
+<table align="center">
+<tr>
+<td align="center"><b>Listening</b></td>
+<td align="center"><b>Processing</b></td>
+<td align="center"><b>Done</b></td>
+</tr>
+<tr>
+<td align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overlay-listening.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/overlay-listening.png">
+  <img src="docs/screenshots/overlay-listening.png" height="60" alt="Listening">
+</picture></td>
+<td align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overlay-processing.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/overlay-processing.png">
+  <img src="docs/screenshots/overlay-processing.png" height="60" alt="Processing">
+</picture></td>
+<td align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overlay-done.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/overlay-done.png">
+  <img src="docs/screenshots/overlay-done.png" height="60" alt="Done">
+</picture></td>
+</tr>
+</table>
+
+## Privacy
+
+Nothing leaves your Mac. Speech recognition, history and settings are all local. The model is downloaded once from Hugging Face by WhisperKit; the only other network use is Sparkle checking for updates.
 
 ## Credits
 

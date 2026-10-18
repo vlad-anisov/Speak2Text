@@ -182,6 +182,7 @@ struct HistoryTab: View {
     @ObservedObject var engine = EngineManager.shared
     @State private var query = ""
     @State private var confirmClear = false
+    @State private var selected: String? = CommandLine.arguments.contains("--screenshots") ? HistoryStore.shared.items.dropFirst().first?.id : nil
 
     private var filtered: [HistoryItem] {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -207,12 +208,14 @@ struct HistoryTab: View {
                 Text(h.items.isEmpty ? L("No dictations yet") : L("Nothing found")).foregroundStyle(.secondary)
                 Spacer()
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(filtered) { it in HistoryRow(item: it, h: h, engineReady: engine.status == .ready) }
-                    }
-                    .padding(.horizontal, 16).padding(.bottom, 8)
+                List(filtered, selection: $selected) { it in
+                    HistoryRow(item: it, h: h, engineReady: engine.status == .ready, expanded: selected == it.id)
+                        .tag(it.id)
+                        .listRowSeparator(.visible)
                 }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+                .onChange(of: selected) { _, _ in h.stopPlayback() }
             }
 
             Divider()
@@ -245,6 +248,7 @@ struct HistoryRow: View {
     let item: HistoryItem
     @ObservedObject var h: HistoryStore
     let engineReady: Bool
+    let expanded: Bool
 
     private var durationText: String {
         let t = Int(item.duration.rounded())
@@ -254,44 +258,60 @@ struct HistoryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(item.date.formatted(date: .abbreviated, time: .shortened))
+                Text(item.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: isRussian ? "ru_RU" : "en_GB"))))
                 Text("·")
                 Text(durationText).monospacedDigit()
                 Spacer()
+                if h.playingID == item.id { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Color.accentColor) }
             }
             .font(.caption).foregroundStyle(.secondary)
             if item.text.isEmpty {
                 Text(L("No text recognized")).italic().foregroundStyle(.secondary)
+            } else if expanded {
+                Text(item.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(item.text).lineLimit(3).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                Text(item.text).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !item.raw.isEmpty && item.raw != item.text {
-                Text(L("Raw: ") + item.raw).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            HStack(spacing: 14) {
-                action("doc.on.doc", L("Copy text"), enabled: !item.text.isEmpty) { h.copy(item) }
-                action(h.playingID == item.id ? "stop.fill" : "play.fill", L("Play / stop audio"), enabled: item.hasAudio) { h.togglePlayback(item) }
-                action("arrow.turn.down.left", L("Paste again"), enabled: !item.text.isEmpty) { h.pasteAgain(item) }
-                if h.busy.contains(item.id) {
-                    ProgressView().controlSize(.small).frame(width: 16)
-                } else {
-                    action("arrow.clockwise", L("Re-transcribe"), enabled: item.hasAudio && engineReady) { h.retranscribe(item) }
+            if expanded {
+                if !item.raw.isEmpty && item.raw != item.text {
+                    Text(L("Raw: ") + item.raw).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
                 }
-                action("folder", L("Show in Finder"), enabled: true) { h.reveal(item) }
-                Spacer()
-                action("trash", L("Delete"), enabled: true) { h.remove(item) }
+                actions.padding(.top, 2)
             }
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.6)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.2)))
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .contextMenu { menuItems }
     }
 
-    private func action(_ symbol: String, _ help: String, enabled: Bool, _ run: @escaping () -> Void) -> some View {
-        Button(action: run) { Image(systemName: symbol).frame(width: 16, height: 16) }
-            .buttonStyle(.borderless)
-            .help(help)
-            .disabled(!enabled)
+    private var playing: Bool { h.playingID == item.id }
+    private var busy: Bool { h.busy.contains(item.id) }
+
+    private var actions: some View {
+        HStack(spacing: 8) {
+            Button { h.copy(item) } label: { Label(L("Copy"), systemImage: "doc.on.doc") }
+                .disabled(item.text.isEmpty).foregroundStyle(.primary)
+            Button { h.togglePlayback(item) } label: { Label(playing ? L("Stop") : L("Play"), systemImage: playing ? "stop.fill" : "play.fill") }
+                .disabled(!item.hasAudio).foregroundStyle(.primary)
+            Button { h.retranscribe(item) } label: {
+                if busy { Label(L("Transcribing…"), systemImage: "arrow.triangle.2.circlepath") } else { Label(L("Re-transcribe"), systemImage: "arrow.clockwise") }
+            }
+            .disabled(!item.hasAudio || !engineReady || busy)
+            .foregroundStyle(.primary)
+            Spacer(minLength: 0)
+            Button(role: .destructive) { h.remove(item) } label: { Label(L("Delete"), systemImage: "trash") }
+        }
+        .controlSize(.small)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var menuItems: some View {
+        Button { h.copy(item) } label: { Label(L("Copy"), systemImage: "doc.on.doc") }.disabled(item.text.isEmpty)
+        Button { h.togglePlayback(item) } label: { Label(playing ? L("Stop") : L("Play"), systemImage: playing ? "stop.fill" : "play.fill") }.disabled(!item.hasAudio)
+        Button { h.retranscribe(item) } label: { Label(L("Re-transcribe"), systemImage: "arrow.clockwise") }.disabled(!item.hasAudio || !engineReady || busy)
+        Divider()
+        Button(role: .destructive) { h.remove(item) } label: { Label(L("Delete"), systemImage: "trash") }
     }
 }
 
@@ -302,7 +322,7 @@ struct AboutTab: View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 72, height: 72)
             Text("Speak2Text").font(.title2.bold())
-            Text(String(format: L("Version %@"), Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.0"))
+            Text(String(format: L("Version %@"), Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3.0"))
                 .foregroundStyle(.secondary)
             Text(L("Local push-to-talk dictation. Nothing leaves your Mac.")).font(.callout)
             HStack {
