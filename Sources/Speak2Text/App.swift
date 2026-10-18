@@ -119,6 +119,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.manager.reload()
         }.store(in: &cancellables)
         manager.reload()
+        if let i = CommandLine.arguments.firstIndex(of: "--screenshots"), i + 1 < CommandLine.arguments.count { runScreenshots(CommandLine.arguments[i + 1]) }
+    }
+
+    /// `--screenshots <dir>`: captures the settings tabs and the permissions window, then quits.
+    func runScreenshots(_ dir: String) {
+        let tabs = ["general", "model", "dictionary", "about"]
+        var delay = 2.0
+        openSettings()
+        for t in tabs {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                SettingsNav.shared.tab = t
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.0) {
+                if let w = self.settingsWindow { captureWindow(w, to: "\(dir)/settings-\(t).png") }
+            }
+            delay += 1.6
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            self.openPermissions()
+            self.settingsWindow?.orderOut(nil)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.5) {
+            if let w = self.permWindow { captureWindow(w, to: "\(dir)/permissions.png") }
+            NSApp.terminate(nil)
+        }
     }
 
     private func menuIcon(_ name: String) -> NSImage? {

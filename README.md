@@ -1,37 +1,46 @@
-# Dictate: push-to-talk диктовка (WhisperKit, локально)
+# Speak2Text
 
-Menu-bar приложение без иконки в Dock. Держишь Right Option, говоришь, отпускаешь, текст вставляется в активное приложение (буфер обмена сохраняется и восстанавливается через ~0.5 с).
-Модель: whisper-large-v3-v20240930_turbo_632MB, `.all` (Neural Engine), язык ru, живое распознавание: каждую секунду перераспознаётся буфер, слова фиксируются по LocalAgreement-2.
+Local push-to-talk dictation for macOS. Hold a hotkey, speak, release: the text is typed into the app you were using. Speech recognition runs fully on-device with [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Core ML), with live partial results so the final text appears about a second after you stop talking. Menu bar app, no Dock icon.
 
-## Сборка
-    ~/dictation-bench/dictate-app/build.sh      # swift build -c release + Dictate.app + ad-hoc codesign
+Requires macOS 14+ on Apple Silicon.
 
-## Запуск
-    open ~/dictation-bench/dictate-app/Dictate.app
+## Install
 
-Иконка в строке меню: микрофон = готов, микрофон красный + REC = запись, `...` = финализация, песочные часы = загрузка модели.
-Первый старт после сборки ОЧЕНЬ долгий (до ~3 мин, компиляция CoreML-графов для ANE), дальше ~4 с. Пока висят песочные часы, хоткей не работает.
-Меню: Open log, Quit.
+1. Build it (see below) or download `Speak2Text-<version>.zip` from the releases page and move `Speak2Text.app` to `~/Applications`.
+2. Launch it and grant the permissions in the first-run window.
+3. The first model load compiles Core ML for the Neural Engine and takes up to ~3 minutes. Later launches take a few seconds. Do not quit the app meanwhile.
 
-## Разрешения (macOS спросит сам при первом запуске / первой диктовке)
-1. Микрофон: запись голоса.
-2. Универсальный доступ (Accessibility): отправка Cmd+V в другое приложение.
-3. Мониторинг ввода (Input Monitoring): отслеживание Right Option (CGEventTap).
-Включаются в Системные настройки > Конфиденциальность и безопасность. После выдачи Accessibility/Input Monitoring приложение перезапустить. Разрешения привязаны к бандлу (ad-hoc подпись); после каждого `build.sh` подпись меняется, и macOS может потребовать выдать их заново (удалить старую запись Dictate и добавить снова).
+## Build
 
-## Конфиг: config.json
-`hotkey`: right_option (по умолчанию), left_option, right_command, left_command, right_control, left_control, right_shift, left_shift, fn. Также `model_folder`, `language`, `live_step_s`. Применяется после перезапуска.
+Only the Xcode Command Line Tools are needed (Swift 6.1+).
 
-## Лог
-`logs/dictate.log`: строка на диктовку: длительность аудио, final_wait (отпускание -> текст вставлен), длина текста, текст.
+```sh
+./build.sh                 # builds, signs and installs ~/Applications/Speak2Text.app
+S2T_NO_INSTALL=1 ./build.sh  # build only, into build/
+S2T_IDENTITY="Developer ID Application: ..." ./build.sh   # custom signing identity
+```
 
-## Тест без микрофона
-    .build/release/dictate --file <wav>     # подаёт wav в реальном времени кусками по 100 мс, печатает текст и final wait
+Test recognition without a microphone:
 
-## Конфликт со Spokenly
-Если Spokenly использует ту же клавишу (Right Option), обе программы сработают одновременно. Поменяй хоткей в одной из них или закрой Spokenly.
+```sh
+Speak2Text --file sample.wav     # prints the text and final_wait (delay after the end of audio)
+```
 
-## Автозапуск
-LaunchAgent `~/Library/LaunchAgents/local.vlad.dictate.plist` (RunAtLoad, `open Dictate.app`), без KeepAlive — Quit из меню не перезапускает.
-Отключить: `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/local.vlad.dictate.plist` и удалить plist.
-Подпись — Apple Development (build.sh), разрешения переживают пересборку.
+Releases: `scripts/release.sh <version>` builds, zips into `dist/` and generates a signed Sparkle `appcast.xml`. It publishes nothing; upload the files to a GitHub release yourself. Signing keys come from Sparkle `generate_keys` (private key in your Keychain, public key in `Info.plist` as `SUPublicEDKey`).
+
+## Permissions
+
+- **Microphone** to record speech.
+- **Input Monitoring** to see the global hotkey.
+- **Accessibility** to paste the text (Cmd+V) into the active app.
+
+The permissions window shows the status of each and opens the right System Settings pane. Text is delivered via the clipboard and the previous clipboard contents are restored right after pasting.
+
+## Settings
+
+- **General**: hotkey (any key, left/right modifiers, combos; default right Option), mode (hold or toggle; Esc cancels), language (ru / en / auto), mute system audio while recording (with restore, also after a crash), overlay, sounds, launch at login.
+- **Model**: Whisper model (download on demand), accelerator (Neural Engine / GPU / CPU), speed test.
+- **Dictionary**: replacements, filler words to remove, and terms passed to the model as a prompt.
+- **About**: version and update check (Sparkle).
+
+Logs: `~/Library/Logs/Speak2Text/speak2text.log`.
