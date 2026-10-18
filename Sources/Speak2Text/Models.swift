@@ -38,12 +38,15 @@ final class EngineManager: ObservableObject, @unchecked Sendable {
     private(set) var engine: WhisperEngine?
     private var loading = false
     private var dirty = false
+    /// Accelerator the engine is loaded (or being loaded) for; a settings change to the same value must not reload.
+    private(set) var targetAccelerator: Accelerator?
 
     /// (Re)loads the engine for the model and accelerator currently chosen in the settings.
     /// A running CoreML compilation is never interrupted: a change made meanwhile is applied after it.
     func reload() {
-        if loading { dirty = true; return }
         let st = Settings.shared
+        targetAccelerator = st.accelerator
+        if loading { dirty = true; return }
         guard let folder = ModelCatalog.folder(for: ModelCatalog.modelID) else {
             engine = nil; status = .needsDownload; appLog("model not downloaded: \(ModelCatalog.modelID)")
             download()   // the model is fixed and not user-selectable: fetch it automatically
@@ -62,7 +65,7 @@ final class EngineManager: ObservableObject, @unchecked Sendable {
                 self.loading = false
                 if let f = failure {
                     appLog("model load FAILED: \(f)")
-                    self.status = .failed(f)
+                    self.status = .failed(f); self.targetAccelerator = nil
                 } else {
                     appLog(String(format: "model loaded+warmed in %.1f s", dt))
                     self.engine = e; self.lastLoadSeconds = dt; self.status = .ready

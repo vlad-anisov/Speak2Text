@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             signalSources.append(src)
         }
         installEditMenu()
-        Sounds.prepare()
+        Sounds.prepare(settings.soundVariant)
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
@@ -117,8 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if st == .ready { if self.state == .loading { self.state = .idle } }
             else if self.state == .idle { self.state = .loading }
         }.store(in: &cancellables)
-        settings.$accelerator.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
-            self?.manager.reload()
+        settings.$accelerator.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] acc in
+            guard let self, acc != self.manager.targetAccelerator else { return }   // re-selecting the current value: nothing to reload
+            self.manager.reload()
         }.store(in: &cancellables)
         manager.reload()
         if let i = CommandLine.arguments.firstIndex(of: "--screenshots"), i + 1 < CommandLine.arguments.count { runScreenshots(CommandLine.arguments[i + 1]) }
@@ -176,7 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let r = Recorder()
         let box = SampleBox()
         // The start blip is played by this process: the microphone is ignored while it sounds, so it never reaches the model or the history.
-        let blip = settings.soundsEnabled ? Sounds.startDuration + 0.04 : 0
+        let blip = settings.soundsEnabled ? Sounds.startDuration(settings.soundVariant) + 0.04 : 0
         let gate = nowS() + blip
         r.onSamples = { [weak s] x in
             if nowS() < gate { return }
@@ -188,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session = s; recorder = r; audio = box; recStart = nowS()
         hotkey.recording = true
         if settings.overlayEnabled { overlay.show() }
-        if settings.soundsEnabled { Sounds.playStart() }
+        if settings.soundsEnabled { Sounds.playStart(settings.soundVariant) }
         if settings.muteEnabled {
             // mute only after the blip, otherwise it would be silenced as well
             let w = DispatchWorkItem { [weak self] in self?.muter.mute() }
@@ -219,7 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkey.recording = false
         muteWork?.cancel(); muteWork = nil
         muter.restore()
-        if settings.soundsEnabled { Sounds.playStop() }
+        if settings.soundsEnabled { Sounds.playStop(settings.soundVariant) }
         state = .finishing
         overlay.processing()
         Task {

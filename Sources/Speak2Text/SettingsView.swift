@@ -66,25 +66,37 @@ struct GeneralTab: View {
                     Divider()
                     ForEach(WhisperLanguages.all, id: \.code) { Text($0.name).tag($0.code) }
                 }
-            } footer: {
-                Text(L("Esc cancels recording")).footerStyle()
             }
             Section {
                 Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
-                Toggle(L("Start and stop sounds"), isOn: $s.soundsEnabled)
+                HStack {
+                    Text(L("Start and stop sounds"))
+                    Spacer()
+                    if s.soundsEnabled {
+                        Picker(L("Sound"), selection: $s.soundVariant) {
+                            ForEach(Sounds.variants, id: \.id) { Text(L($0.en)).tag($0.id) }
+                        }
+                        .labelsHidden().fixedSize()
+                        .onChange(of: s.soundVariant) { _, v in Sounds.preview(v) }
+                    }
+                    Toggle(L("Start and stop sounds"), isOn: $s.soundsEnabled).labelsHidden()
+                }
                 Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
                 Toggle(L("Remove filler words"), isOn: $s.fillersEnabled)
                 Toggle(L("Launch at login"), isOn: $s.launchAtLogin)
             }
             Section {
-                Picker(L("Accelerator"), selection: $s.accelerator) {
-                    Text("Neural Engine").tag(Accelerator.ane)
-                    Text("GPU").tag(Accelerator.gpu)
-                    Text("CPU").tag(Accelerator.cpu)
+                HStack(spacing: 8) {
+                    Text(L("Accelerator"))
+                    Spacer()
+                    statusLine.font(.callout).foregroundStyle(.secondary)
+                    Picker(L("Accelerator"), selection: $s.accelerator) {
+                        Text("Neural Engine").tag(Accelerator.ane)
+                        Text("GPU").tag(Accelerator.gpu)
+                        Text("CPU").tag(Accelerator.cpu)
+                    }
+                    .labelsHidden().fixedSize()
                 }
-                if let p = m.downloads[ModelCatalog.modelID] { ProgressView(value: p) }
-            } footer: {
-                statusLine.footerStyle()
             }
         }
         .formStyle(.grouped)
@@ -124,18 +136,25 @@ struct GeneralTab: View {
 
     @ViewBuilder private var statusLine: some View {
         if let p = m.downloads[ModelCatalog.modelID] {
-            Text("\(L("Downloading")) \(Int(p * 100))%").monospacedDigit()
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("\(L("Downloading")) \(Int(p * 100))%").monospacedDigit()
+            }
         } else {
             switch m.status {
             case .preparing:
-                TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                    let secs = Int(ctx.date.timeIntervalSince(m.preparingSince ?? ctx.date))
-                    Text(String(format: "%@ %d:%02d", L("Preparing…"), secs / 60, secs % 60)).monospacedDigit()
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        let secs = Int(ctx.date.timeIntervalSince(m.preparingSince ?? ctx.date))
+                        Text(String(format: "%@ %d:%02d", L("Preparing…"), secs / 60, secs % 60)).monospacedDigit()
+                    }
                 }
             case .ready: Text(L("Ready"))
-            case .needsDownload: Text(L("Downloading"))
+            case .needsDownload:
+                HStack(spacing: 6) { ProgressView().controlSize(.small); Text(L("Downloading")) }
             case .failed(let e):
-                HStack { Text(e).lineLimit(2); Button(L("Retry")) { m.reload() } }
+                HStack { Text(e).lineLimit(1).help(e); Button(L("Retry")) { m.reload() } }
             }
         }
     }

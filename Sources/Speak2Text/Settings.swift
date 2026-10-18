@@ -17,6 +17,8 @@ final class Settings: ObservableObject {
     @Published var muteEnabled: Bool { didSet { d.set(muteEnabled, forKey: "muteEnabled") } }
     @Published var overlayEnabled: Bool { didSet { d.set(overlayEnabled, forKey: "overlayEnabled") } }
     @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
+    /// Id of the start/stop sound variant (see `Sounds.variants`).
+    @Published var soundVariant: String { didSet { d.set(soundVariant, forKey: "soundVariant") } }
     @Published var launchAtLogin: Bool { didSet { d.set(launchAtLogin, forKey: "launchAtLogin") } }
     @Published var accelerator: Accelerator { didSet { d.set(accelerator.rawValue, forKey: "accelerator") } }
     @Published var fillersEnabled: Bool { didSet { d.set(fillersEnabled, forKey: "fillersEnabled") } }
@@ -40,10 +42,10 @@ final class Settings: ObservableObject {
         muteEnabled = bool("muteEnabled", true)
         overlayEnabled = bool("overlayEnabled", true)
         soundsEnabled = bool("soundsEnabled", true)
+        soundVariant = d.string(forKey: "soundVariant").flatMap { v in Sounds.variants.contains { $0.id == v } ? v : nil } ?? Sounds.variants[0].id
         launchAtLogin = bool("launchAtLogin", true)
         accelerator = Accelerator(rawValue: d.string(forKey: "accelerator") ?? "") ?? .ane
-        fillersEnabled = bool("fillersEnabled", false)
-        if CommandLine.arguments.contains("--screenshots") { fillersEnabled = false }
+        fillersEnabled = bool("fillersEnabled", true)   // on unless the user switched it off explicitly
         historyEnabled = bool("historyEnabled", true)
         historyDays = d.object(forKey: "historyDays") as? Int ?? 30
     }

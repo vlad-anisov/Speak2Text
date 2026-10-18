@@ -202,20 +202,34 @@ func iconC() -> CGImage {
     return c.makeImage()!
 }
 
-/// Template-иконка меню-бара (чёрный + альфа): 4 столбика как в оверлее (0.54/1/0.69/0.85) на сетке 18 pt,
-/// все границы на целых пикселях @1x; rec — ниже и с точкой записи.
-func menuBar(_ px: Int, rec: Bool) -> CGImage {
+/// Template-иконка меню-бара (чёрный + альфа): миниатюра столбиков иконки приложения m1 (84/56 при высотах 210/390/270/330 из 1024):
+/// ширина:зазор = 3:2, высоты 0.54/1/0.69/0.85. На сетке 18 pt: столбик 3, зазор 2, ширина группы 18, высота 14 (8/14/10/12 pt,
+/// чётные пиксели @2x: 16/28/20/24 → центр по вертикали на целых пикселях). Полностью скруглённые торцы.
+/// rec — тот же рисунок: отдельной точки нет (её принимали за столбик); запись macOS и так показывает оранжевым индикатором.
+func menuBar(_ px: Int, rec: Bool, ink: UInt32 = 0x000000) -> CGImage {
     let c = makeContext(px, px)
     let k = CGFloat(px) / 18
     c.scaleBy(x: k, y: k)
-    c.setFillColor(col(0x000000))
-    let hs: [CGFloat] = rec ? [6, 14, 10, 12] : [8, 16, 12, 14]
-    let w: CGFloat = 2, pitch: CGFloat = rec ? 3 : 4, x0: CGFloat = rec ? 0 : 2
+    c.setFillColor(col(ink))
+    let hs: [CGFloat] = [8, 14, 10, 12]
+    let w: CGFloat = 3, pitch: CGFloat = 5
     for (i, h) in hs.enumerated() {
-        let r = CGRect(x: x0 + CGFloat(i) * pitch, y: (18 - h) / 2, width: w, height: h)
+        let r = CGRect(x: CGFloat(i) * pitch, y: (18 - h) / 2, width: w, height: h)
         c.addPath(CGPath(roundedRect: r, cornerWidth: w / 2, cornerHeight: w / 2, transform: nil)); c.fillPath()
     }
-    if rec { c.fillEllipse(in: CGRect(x: 13, y: 7, width: 4, height: 4)) }
+    return c.makeImage()!
+}
+
+/// Сравнение: иконка приложения (m1) и иконка меню-бара в 12-кратном увеличении (чёрное на светлом, белое на тёмном).
+func menuBarCompare() -> CGImage {
+    let W = 1300, H = 560
+    let c = makeContext(W, H)
+    c.setFillColor(col(0xE9E9EB)); c.fill(CGRect(x: 0, y: 0, width: 880, height: H))
+    c.setFillColor(col(0x2B2B2E)); c.fill(CGRect(x: 880, y: 0, width: W - 880, height: H))
+    c.draw(minIcon(1), in: CGRect(x: 40, y: 28, width: 504, height: 504))
+    c.interpolationQuality = .none
+    c.draw(menuBar(36, rec: false), in: CGRect(x: 612, y: 172, width: 216, height: 216))
+    c.draw(menuBar(36, rec: false, ink: 0xFFFFFF), in: CGRect(x: 960, y: 172, width: 216, height: 216))
     return c.makeImage()!
 }
 
@@ -662,6 +676,7 @@ case "iconset": // m1 -> <outdir>/AppIcon.iconset (затем iconutil -c icns)
                        ("256x256", 256), ("256x256@2x", 512), ("512x512", 512), ("512x512@2x", 1024)] {
         writePNG(px <= 64 ? m1Pixel(px) : (px == 1024 ? full : scaled(full, px)), "\(dir)/icon_\(name).png")
     }
+case "menubar-compare": writePNG(menuBarCompare(), "\(out)/menubar-compare.png")
 case "preview": writePNG(preview(out), "\(out)/preview.png")
 case "textall":
     for n in 1...12 { writePNG(textIcon(n), "\(out)/t\(n).png") }

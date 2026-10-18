@@ -17,7 +17,6 @@ private let russian: [String: String] = [
     "Settings": "Настройки",
     "Hold": "Удерживать",
     "Press": "Нажать",
-    "Esc cancels recording": "Esc отменяет запись",
     "Same as system": "Как в системе",
     "Permissions needed": "Нужны разрешения",
     "Downloading": "Загрузка",
@@ -39,6 +38,9 @@ private let russian: [String: String] = [
     "Auto-detect": "Автоопределение",
     "Mute other sounds while recording": "Заглушать другие звуки при записи",
     "Start and stop sounds": "Звуки старта и стопа",
+    "Sound": "Звук",
+    "Classic": "Классический", "Pluck": "Щипок", "Marimba": "Маримба", "Glass": "Стекло", "Wood": "Дерево",
+    "Chime": "Колокольчик", "Pop": "Пузырёк", "Breath": "Дыхание", "Bell": "Звон", "Tick": "Тик",
     "Show overlay while recording": "Показывать плашку при записи",
     "Launch at login": "Запускать при входе",
     // model
