@@ -7,6 +7,7 @@ import Sparkle
 final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shared: AppDelegate?
     var settingsWindow: NSWindow?
+    var settingsTitleSub: Any?
     let updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     let overlay = OverlayController()
     let muter = AudioMuter()

@@ -76,7 +76,7 @@
 13. **Лог**: `~/Library/Logs/Speak2Text/speak2text.log`. Формат строк как в прототипе: audio, final_wait, len, text.
 
 ## Настройки — окно
-Окно настроек: NSWindow с `.fullSizeContentView`, внутри SwiftUI NavigationSplitView: слева боковая панель (SF Symbols, фиксированная ширина, не сворачивается), справа Form `.grouped`; последний открытый раздел запоминается. Разделы:
+Окно настроек: NSWindow с `.fullSizeContentView`, контент — NSSplitViewController: слева боковая панель (`sidebarWithViewController`, ширина 190–260, не сворачивается, SF Symbols), справа SwiftUI Form `.grouped`; подписи секций — footer, слева, мелким вторичным шрифтом. Последний раздел запоминается. Разделы:
 - **Основные** (gear): клавиша (кейкап-чип: клик → «Нажмите клавишу…», Esc отменяет, ⓧ сбрасывает на правый Option), режим, язык, заглушение, звуки, плашка, автозапуск, «Выйти из Speak2Text»;
 - **Модель** (cpu): модель и скачивание, ускоритель;
 - **Словарь** (character.book.closed): замены, слова-паразиты;

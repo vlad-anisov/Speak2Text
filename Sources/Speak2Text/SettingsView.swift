@@ -62,6 +62,7 @@ struct GeneralTab: View {
             } footer: {
                 Text(s.mode == "hold" ? L("Hold the key while you speak, release it to insert the text.")
                                       : L("Press once to start, again to stop and insert the text. Esc cancels the recording."))
+                    .footerStyle()
             }
             Section {
                 Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
@@ -119,6 +120,7 @@ struct ModelTab: View {
                 statusLine
             } footer: {
                 Text(L("Changing the accelerator recompiles CoreML: the first load can take up to about 3 minutes. Do not quit the app meanwhile."))
+                    .footerStyle()
             }
         }
         .formStyle(.grouped)
@@ -218,6 +220,7 @@ struct DictionaryTab: View {
                 Text(L("Replacements"))
             } footer: {
                 Text(L("Applied to the final text, ignoring case, on whole words only."))
+                    .footerStyle()
             }
             Section {
                 Toggle(L("Remove filler words"), isOn: $s.fillersEnabled)
@@ -227,7 +230,7 @@ struct DictionaryTab: View {
             } header: {
                 Text(L("Filler words"))
             } footer: {
-                if s.fillersEnabled { Text(L("Separated by commas. Removed together with the commas around them.")) }
+                if s.fillersEnabled { Text(L("Separated by commas. Removed together with the commas around them.")).footerStyle() }
             }
         }
         .formStyle(.grouped)
@@ -375,5 +378,14 @@ struct AboutTab: View {
         }
         .padding(.top, 28)
         .frame(maxWidth: .infinity)
+    }
+}
+
+extension View {
+    /// Подпись секции: слева, вторичным цветом, мелким шрифтом.
+    func footerStyle() -> some View {
+        self.font(.caption).foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

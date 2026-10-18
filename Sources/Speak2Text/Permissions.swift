@@ -78,7 +78,7 @@ struct PermissionsView: View {
                 Text(L("Speak2Text needs three permissions"))
             } footer: {
                 if !m.allOK {
-                    Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again.") + " " + L("If the app is already in the list, remove it with the − button and add it again."))
+                    Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again.") + " " + L("If the app is already in the list, remove it with the − button and add it again.")).footerStyle()
                 }
             }
             Section {
