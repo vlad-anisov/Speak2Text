@@ -48,6 +48,7 @@ func runFile(_ path: String) async {
 }
 
 let args = CommandLine.arguments
+if args.contains("--test-dictionary") { exit(TextProcessor.selfTest() ? 0 : 1) }
 if args.contains("--test-mute") {
     // measured check: mute to 0, read back, restore, read back
     let before = AudioMuter.currentVolume()

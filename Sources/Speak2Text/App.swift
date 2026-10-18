@@ -115,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func startRecording() {
         guard state == .idle else { return }
         engine.language = settings.language
+        engine.promptTokens = settings.promptEnabled ? engine.tokens(forPrompt: settings.promptTerms) : nil
         let s = engine.newSession()
         let r = Recorder()
         r.onSamples = { [weak s] x in s?.feed(x) }
@@ -151,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             let dur = Double(s.totalSamples) / 16000.0
             let raw = await s.finish()
-            let text = normalizeText(raw)
+            let text = TextProcessor.current(normalizeText(raw))
             await MainActor.run {
                 if text.isEmpty { appLog("empty result, nothing inserted"); self.overlay.hide() } else { Inserter.insert(text); self.overlay.done() }
                 let wait = nowS() - tRelease
