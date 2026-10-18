@@ -3,7 +3,9 @@ import SwiftUI
 /// Selected tab id; the window controller and the views share it (e.g. to open the Permissions tab).
 final class SettingsNav: ObservableObject {
     static let shared = SettingsNav()
-    @Published var tab = "general"
+    @Published var tab = UserDefaults.standard.string(forKey: "settingsTab") ?? "general" {
+        didSet { UserDefaults.standard.set(tab, forKey: "settingsTab") }
+    }
 }
 
 // MARK: - General
@@ -15,14 +17,11 @@ struct KeycapChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(.body, design: .rounded).weight(.medium))
             .foregroundStyle(recording ? Color.accentColor : Color.primary)
-            .padding(.horizontal, 12).padding(.vertical, 5)
-            .frame(minWidth: 84)
-            .background(RoundedRectangle(cornerRadius: 7).fill(recording ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(recording ? Color.accentColor : Color.secondary.opacity(0.45), lineWidth: recording ? 1.5 : 1))
-            .shadow(color: .black.opacity(0.22), radius: 0, x: 0, y: 1.5)
-            .padding(.bottom, 1.5)
+            .padding(.horizontal, 10).padding(.vertical, 3)
+            .frame(minWidth: 72)
+            .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(recording ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: 1))
     }
 }
 
@@ -55,14 +54,14 @@ struct GeneralTab: View {
                     Text(L("Hold to talk")).tag("hold")
                     Text(L("Press to start/stop")).tag("toggle")
                 }
-                Text(s.mode == "hold" ? L("Hold the key while you speak, release it to insert the text.")
-                                      : L("Press once to start, again to stop and insert the text. Esc cancels the recording."))
-                    .font(.caption).foregroundStyle(.secondary)
                 Picker(L("Language"), selection: $s.language) {
                     Text("Русский").tag("ru")
                     Text("English").tag("en")
                     Text(L("Auto-detect")).tag("auto")
                 }
+            } footer: {
+                Text(s.mode == "hold" ? L("Hold the key while you speak, release it to insert the text.")
+                                      : L("Press once to start, again to stop and insert the text. Esc cancels the recording."))
             }
             Section {
                 Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
@@ -110,7 +109,7 @@ struct ModelTab: View {
 
     var body: some View {
         Form {
-            Section(L("Model")) {
+            Section {
                 modelRow
                 Picker(L("Accelerator"), selection: $s.accelerator) {
                     Text("Neural Engine").tag(Accelerator.ane)
@@ -118,8 +117,8 @@ struct ModelTab: View {
                     Text("CPU").tag(Accelerator.cpu)
                 }
                 statusLine
+            } footer: {
                 Text(L("Changing the accelerator recompiles CoreML: the first load can take up to about 3 minutes. Do not quit the app meanwhile."))
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -193,9 +192,9 @@ struct DictionaryTab: View {
         Form {
             Section {
                 Text(L("Fix words the model gets wrong and cut filler words. Applied to every dictation before the text is inserted."))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .foregroundStyle(.secondary)
             }
-            Section(L("Replacements")) {
+            Section {
                 if !s.replacements.isEmpty {
                     HStack(spacing: 8) {
                         Text(L("Heard")).frame(maxWidth: .infinity, alignment: .leading)
@@ -215,16 +214,20 @@ struct DictionaryTab: View {
                     .labelsHidden()
                 }
                 Button { s.replacements.append(Replacement(from: "", to: "")) } label: { Label(L("Add"), systemImage: "plus") }
+            } header: {
+                Text(L("Replacements"))
+            } footer: {
                 Text(L("Applied to the final text, ignoring case, on whole words only."))
-                    .font(.caption).foregroundStyle(.secondary)
             }
-            Section(L("Filler words")) {
+            Section {
                 Toggle(L("Remove filler words"), isOn: $s.fillersEnabled)
                 if s.fillersEnabled {
                     TermsEditor(terms: $s.fillers).labelsHidden()
-                    Text(L("Separated by commas. Removed together with the commas around them."))
-                        .font(.caption).foregroundStyle(.secondary)
                 }
+            } header: {
+                Text(L("Filler words"))
+            } footer: {
+                if s.fillersEnabled { Text(L("Separated by commas. Removed together with the commas around them.")) }
             }
         }
         .formStyle(.grouped)
@@ -256,7 +259,7 @@ struct HistoryTab: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
             .padding([.horizontal, .top], 16).padding(.bottom, 10)
 
             if filtered.isEmpty {
@@ -340,7 +343,7 @@ struct HistoryRow: View {
             }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.6)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.2)))
     }
 

@@ -1,65 +1,67 @@
 import Cocoa
 import SwiftUI
 
-/// Settings window in the standard preferences style: an NSTabViewController with toolbar tabs (icon + title).
-final class SettingsTabController: NSTabViewController {
-    private struct Tab { let id: String; let title: String; let symbol: String; let size: NSSize; let view: AnyView }
+/// Modern settings window: translucent sidebar (NavigationSplitView) + grouped forms in the detail pane.
+struct SettingsRoot: View {
+    @ObservedObject var nav = SettingsNav.shared
 
-    private var tabs: [Tab] {
-        [
-            Tab(id: "general", title: L("General"), symbol: "gearshape", size: NSSize(width: 560, height: 440), view: AnyView(GeneralTab())),
-            Tab(id: "model", title: L("Model"), symbol: "cpu", size: NSSize(width: 560, height: 290), view: AnyView(ModelTab())),
-            Tab(id: "dictionary", title: L("Dictionary"), symbol: "character.book.closed", size: NSSize(width: 560, height: 560), view: AnyView(DictionaryTab())),
-            Tab(id: "history", title: L("History"), symbol: "clock.arrow.circlepath", size: NSSize(width: 560, height: 560), view: AnyView(HistoryTab())),
-            Tab(id: "permissions", title: L("Permissions"), symbol: "lock.shield", size: NSSize(width: 560, height: 380), view: AnyView(PermissionsView())),
-            Tab(id: "about", title: L("About"), symbol: "info.circle", size: NSSize(width: 560, height: 300), view: AnyView(AboutTab())),
-        ]
+    private struct Item: Identifiable { let id: String; let title: String; let symbol: String; var idv: String { id } }
+    private var items: [Item] {
+        [Item(id: "general", title: L("General"), symbol: "gearshape"),
+         Item(id: "model", title: L("Model"), symbol: "cpu"),
+         Item(id: "dictionary", title: L("Dictionary"), symbol: "character.book.closed"),
+         Item(id: "history", title: L("History"), symbol: "clock.arrow.circlepath"),
+         Item(id: "permissions", title: L("Permissions"), symbol: "lock.shield"),
+         Item(id: "about", title: L("About"), symbol: "info.circle")]
     }
-    private var ids: [String] = []
 
-    override func viewDidLoad() {
-        tabStyle = .toolbar
-        super.viewDidLoad()
-        for t in tabs {
-            let hc = NSHostingController(rootView: t.view.frame(width: t.size.width, height: t.size.height))
-            hc.preferredContentSize = t.size
-            let item = NSTabViewItem(viewController: hc)
-            item.label = t.title
-            item.image = NSImage(systemSymbolName: t.symbol, accessibilityDescription: t.title)
-            item.identifier = t.id
-            addTabViewItem(item)
-            ids.append(t.id)
+    var body: some View {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
+            List(selection: Binding<String?>(get: { nav.tab }, set: { if let v = $0 { nav.tab = v } })) {
+                ForEach(items) { it in
+                    Label(it.title, systemImage: it.symbol).tag(it.id)
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            detail
+                .navigationTitle(items.first { $0.id == nav.tab }?.title ?? "Speak2Text")
         }
+        .frame(minWidth: 680, minHeight: 460)
     }
 
-    func select(_ id: String) {
-        if let i = ids.firstIndex(of: id), selectedTabViewItemIndex != i { selectedTabViewItemIndex = i }
-    }
-
-    override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
-        super.tabView(tabView, didSelect: tabViewItem)
-        if let id = tabViewItem?.identifier as? String { SettingsNav.shared.tab = id }
-        view.window?.title = tabViewItem?.label ?? "Speak2Text"
+    @ViewBuilder private var detail: some View {
+        switch nav.tab {
+        case "model": ModelTab()
+        case "dictionary": DictionaryTab()
+        case "history": HistoryTab()
+        case "permissions": PermissionsView()
+        case "about": AboutTab()
+        default: GeneralTab()
+        }
     }
 }
 
 extension AppDelegate {
-    /// Opens (or brings to the front) the settings window, optionally on a given tab.
     @objc func openSettingsFromMenu() { openSettings(tab: nil) }
 
+    /// Opens (or brings to the front) the settings window, optionally on a given section.
     func openSettings(tab: String?) {
         if settingsWindow == nil {
-            let vc = SettingsTabController()
-            let w = NSWindow(contentViewController: vc)
-            w.styleMask = [.titled, .closable]
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsRoot()))
+            w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            w.titlebarAppearsTransparent = true
+            w.toolbarStyle = .unified
             w.isReleasedWhenClosed = false
-            w.toolbarStyle = .preference
-            w.center()
+            w.minSize = NSSize(width: 680, height: 460)
+            w.setContentSize(NSSize(width: 760, height: 560))
+            w.setFrameAutosaveName("SettingsWindow")
+            if !w.setFrameUsingName("SettingsWindow") { w.center() }
             settingsWindow = w
-            settingsTabs = vc
         }
-        if let tab { settingsTabs?.select(tab) }
-        settingsWindow?.title = settingsTabs?.tabViewItems[settingsTabs?.selectedTabViewItemIndex ?? 0].label ?? "Speak2Text"
+        if let tab { SettingsNav.shared.tab = tab }
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
     }

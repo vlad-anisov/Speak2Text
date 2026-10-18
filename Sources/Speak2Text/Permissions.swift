@@ -76,15 +76,15 @@ struct PermissionsView: View {
                 row(L("Accessibility"), L("to paste the text with Cmd+V"), m.ax, m.openAX)
             } header: {
                 Text(L("Speak2Text needs three permissions"))
+            } footer: {
+                if !m.allOK {
+                    Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again.") + " " + L("If the app is already in the list, remove it with the − button and add it again."))
+                }
             }
             Section {
                 if !m.allOK {
-                    Text(L("Speak2Text is not in the Input Monitoring list? Quit System Settings (⌘Q) and press the button again."))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text(L("If the app is already in the list, remove it with the − button and add it again."))
-                        .font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        Text(L("Granted but still showing ✗? The app must be restarted.")).font(.caption).foregroundStyle(.secondary)
+                        Text(L("Granted but still showing ✗? The app must be restarted.")).foregroundStyle(.secondary)
                         Spacer()
                         Button(L("Restart")) { Permissions.relaunch() }
                     }

@@ -22,7 +22,7 @@ private let russian: [String: String] = [
     "Dictionary": "Словарь",
     "History": "История",
     "Permissions": "Разрешения",
-    "About": "О программе",
+    "About": "Справка",
     // general
     "Hotkey": "Клавиша",
     "Press a key…": "Нажмите клавишу…",
