@@ -5,7 +5,7 @@ enum Sounds {
     private static func player(_ name: String) -> AVAudioPlayer? {
         let url = Bundle.main.url(forResource: name, withExtension: "wav") ?? URL(fileURLWithPath: "Resources/\(name).wav")
         let p = try? AVAudioPlayer(contentsOf: url)
-        p?.volume = 0.8
+        p?.volume = 0.6
         p?.prepareToPlay()
         return p
     }
