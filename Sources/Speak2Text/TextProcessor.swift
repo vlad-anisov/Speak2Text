@@ -10,9 +10,38 @@ enum TextProcessor {
     static let weakFillers = ["ну", "ну вот", "типа", "как бы", "так сказать", "короче", "вот"]
 
     static func process(_ text: String, fillers: Bool) -> String {
-        var t = BuiltinDictionary.apply(text)
+        var t = removeHallucinations(BuiltinDictionary.apply(text))
         if fillers { t = removeFillers(t) }
         return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whisper's "subtitle" hallucinations inside a long text (on pauses). Rule: removed only as a standalone sentence
+    /// ("Продолжение следует..."), never as part of a longer one ("продолжение следует завтра"); credits lines
+    /// ("Субтитры сделал DimaTorzok", "Редактор субтитров …") are removed from the marker to the end of the sentence.
+    static func removeHallucinations(_ text: String) -> String {
+        var t = text
+        let end = "(?-i:(?<!\\b\\p{Lu})[.!?…]+(?=\\s|$))"
+        let credits = [
+            "(?<!\(wordChar))субтитры\\s+\\S+\\s+dimatorzok[.!?…]*",
+            "(?<!\(wordChar))(?:редактор\\s+субтитров|субтитры\\s+(?:сделал|делал|создавал|подготовил|подогнал)|subtitles\\s+by|amara\\.org)[^\\n]*?(?:\(end)|$)",
+        ]
+        for c in credits {
+            guard let re = try? NSRegularExpression(pattern: c, options: [.caseInsensitive]) else { continue }
+            t = re.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "")
+        }
+        let phrases = Hallucination.phrases
+        guard let sre = try? NSRegularExpression(pattern: "[^.!?…]+[.!?…]*\\s*|[.!?…]+\\s*") else { return t }
+        var out = ""
+        for m in sre.matches(in: t, range: NSRange(t.startIndex..., in: t)) {
+            guard let r = Range(m.range, in: t) else { continue }
+            let sentence = String(t[r])
+            let bare = sentence.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).joined(separator: " ")
+            if phrases.contains(bare) { continue }
+            out += sentence
+        }
+        out = out.replacingOccurrences(of: "[ \\t]{2,}", with: " ", options: .regularExpression)
+        out = out.replacingOccurrences(of: "\\s+([,.!?;:])", with: "$1", options: .regularExpression)
+        return out.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Removes filler words together with the commas around them; keeps the next word capitalised when the filler opened a sentence.
@@ -101,6 +130,15 @@ enum TextProcessor {
             ("Вот это да, стал короче", true, "Вот это да, стал короче"),
             ("Намного лучше, нужно эхо", true, "Намного лучше, нужно эхо"),
             ("Ну, давай", false, "Ну, давай"),
+            // hallucinations inside long text
+            ("Первая часть. Продолжение следует... Вторая часть.", false, "Первая часть. Вторая часть."),
+            ("Сделали задачу… Продолжение следует... Потом проверили", false, "Сделали задачу… Потом проверили"),
+            ("Всё готово. Субтитры сделал DimaTorzok", false, "Всё готово."),
+            ("Начало. Субтитры создавал DimaTorzok Конец.", false, "Начало. Конец."),
+            ("Текст. Редактор субтитров А.Семкин Корректор А.Егорова. Дальше.", false, "Текст. Дальше."),
+            ("Говорю долго. Спасибо за просмотр! И ещё. Thanks for watching.", false, "Говорю долго. И ещё."),
+            ("Продолжение следует завтра, обсудим", false, "Продолжение следует завтра, обсудим"),
+            ("Он сказал, что продолжение следует, и ушёл", false, "Он сказал, что продолжение следует, и ушёл"),
         ]
         var ok = true
         for (inp, f, want) in cases {
