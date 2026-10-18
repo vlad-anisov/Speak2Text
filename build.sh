@@ -20,6 +20,7 @@ for l in en ru; do mkdir -p "$APP/Contents/Resources/$l.lproj"; cp Resources/$l.
 cp Resources/AppIcon.icns "$APP/Contents/Resources/" 2>/dev/null || echo "note: Resources/AppIcon.icns not found, default icon"
 cp Resources/MenuBarIcon*.png "$APP/Contents/Resources/" 2>/dev/null || echo "note: Resources/MenuBarIcon*.png not found, using SF Symbol waveform"
 [ -f Resources/sample.wav ] && cp Resources/sample.wav "$APP/Contents/Resources/"
+cp Resources/start.wav Resources/stop.wav "$APP/Contents/Resources/"
 
 # Sparkle.framework (if the package provides it)
 SPARKLE="$(find .build/artifacts -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' 2>/dev/null | head -1 || true)"
