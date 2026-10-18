@@ -7,6 +7,8 @@ final class Recorder {
     private var converter: AVAudioConverter?
     private let outFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     var onSamples: (([Float]) -> Void)?
+    /// RMS of each delivered piece (0...1), called on the audio thread.
+    var onLevel: ((Float) -> Void)?
 
     func start() throws {
         let input = engine.inputNode
@@ -38,7 +40,13 @@ final class Recorder {
             given = true; status.pointee = .haveData; return buf
         }
         if err == nil, out.frameLength > 0, let p = out.floatChannelData {
-            onSamples?(Array(UnsafeBufferPointer(start: p[0], count: Int(out.frameLength))))
+            let x = Array(UnsafeBufferPointer(start: p[0], count: Int(out.frameLength)))
+            if let lv = onLevel {
+                var sum: Float = 0
+                for v in x { sum += v * v }
+                lv((sum / Float(x.count)).squareRoot())
+            }
+            onSamples?(x)
         }
     }
 }

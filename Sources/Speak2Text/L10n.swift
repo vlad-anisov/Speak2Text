@@ -39,5 +39,6 @@ private let russian: [String: String] = [
     "Hold the key, speak, release: the text is inserted.": "Держите клавишу, говорите, отпустите: текст вставится.",
     "Esc cancels the recording.": "Esc отменяет запись.",
     "Language": "Язык",
+    "Show overlay while recording": "Показывать плашку при записи",
     "Auto-detect": "Автоопределение",
 ]

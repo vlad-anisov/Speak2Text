@@ -44,6 +44,7 @@ struct GeneralTab: View {
                 }
                 Text(s.mode == "hold" ? L("Hold the key, speak, release: the text is inserted.") : L("Esc cancels the recording."))
                     .font(.caption).foregroundStyle(.secondary)
+                Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
                 Picker(L("Language"), selection: $s.language) {
                     Text("Русский").tag("ru")
                     Text("English").tag("en")

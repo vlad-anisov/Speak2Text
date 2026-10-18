@@ -6,6 +6,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shared: AppDelegate?
     var settingsWindow: NSWindow?
+    let overlay = OverlayController()
     enum State { case loading, idle, recording, finishing }
     var item: NSStatusItem!
     var state: State = .loading { didSet { updateIcon() } }
@@ -107,10 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let s = engine.newSession()
         let r = Recorder()
         r.onSamples = { [weak s] x in s?.feed(x) }
+        r.onLevel = { [weak self] v in self?.overlay.setLevel(v) }
         do { try r.start() } catch { appLog("record start failed: \(error)"); return }
         s.start()
         session = s; recorder = r; recStart = nowS()
         hotkey.recording = true
+        if settings.overlayEnabled { overlay.show() }
         state = .recording
     }
 
@@ -118,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard state == .recording, let s = session, let r = recorder else { return }
         r.stop(); recorder = nil; session = nil
         hotkey.recording = false
+        overlay.hide()
         s.cancel()
         appLog(String(format: "cancelled (%@) after %.2fs", reason, nowS() - recStart))
         state = .idle
@@ -130,12 +134,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         r.stop(); recorder = nil; session = nil
         hotkey.recording = false
         state = .finishing
+        overlay.processing()
         Task {
             let dur = Double(s.totalSamples) / 16000.0
             let raw = await s.finish()
             let text = normalizeText(raw)
             await MainActor.run {
-                if text.isEmpty { appLog("empty result, nothing inserted") } else { Inserter.insert(text) }
+                if text.isEmpty { appLog("empty result, nothing inserted"); self.overlay.hide() } else { Inserter.insert(text); self.overlay.done() }
                 let wait = nowS() - tRelease
                 appLog(String(format: "audio=%.2fs final_wait=%.2fs len=%d text=%@", dur, wait, text.count, text))
                 self.state = .idle

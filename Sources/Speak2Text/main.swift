@@ -48,7 +48,13 @@ func runFile(_ path: String) async {
 }
 
 let args = CommandLine.arguments
-if let i = args.firstIndex(of: "--file"), i + 1 < args.count {
+if let i = args.firstIndex(of: "--demo-overlay") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let d = OverlayDemo(dir: i + 1 < args.count ? args[i + 1] : nil)
+    app.delegate = d
+    app.run()
+} else if let i = args.firstIndex(of: "--file"), i + 1 < args.count {
     Task { await runFile(args[i + 1]) }
     dispatchMain()
 } else {
