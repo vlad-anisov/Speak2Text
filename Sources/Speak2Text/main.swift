@@ -48,6 +48,23 @@ func runFile(_ path: String) async {
 }
 
 let args = CommandLine.arguments
+if args.contains("--test-mute") {
+    // measured check: mute to 0, read back, restore, read back
+    let before = AudioMuter.currentVolume()
+    let mu = AudioMuter()
+    print("volume before: \(before.map { String($0) } ?? "n/a")")
+    mu.mute(to: 0)
+    print("volume muted: \(AudioMuter.currentVolume().map { String($0) } ?? "n/a"), state file: \(AudioMuter.hasPendingRestore)")
+    if args.contains("--crash") { print("simulating crash"); kill(getpid(), SIGKILL) }
+    mu.restore()
+    print("volume restored: \(AudioMuter.currentVolume().map { String($0) } ?? "n/a"), state file: \(AudioMuter.hasPendingRestore)")
+    exit(0)
+}
+if args.contains("--test-mute-recover") {
+    print("pending: \(AudioMuter.hasPendingRestore), volume now: \(AudioMuter.currentVolume().map { String($0) } ?? "n/a")")
+    print("restored: \(AudioMuter.restoreFromDisk()), volume now: \(AudioMuter.currentVolume().map { String($0) } ?? "n/a")")
+    exit(0)
+}
 if let i = args.firstIndex(of: "--demo-overlay") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)

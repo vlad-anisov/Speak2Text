@@ -44,6 +44,14 @@ struct GeneralTab: View {
                 }
                 Text(s.mode == "hold" ? L("Hold the key, speak, release: the text is inserted.") : L("Esc cancels the recording."))
                     .font(.caption).foregroundStyle(.secondary)
+                Toggle(L("Mute other sounds while recording"), isOn: $s.muteEnabled)
+                if s.muteEnabled {
+                    HStack {
+                        Text(L("Volume while recording"))
+                        Slider(value: Binding(get: { Double(s.muteLevel) }, set: { s.muteLevel = Int($0) }), in: 0...50, step: 5)
+                        Text("\(s.muteLevel)%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                    }
+                }
                 Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
                 Picker(L("Language"), selection: $s.language) {
                     Text("Русский").tag("ru")

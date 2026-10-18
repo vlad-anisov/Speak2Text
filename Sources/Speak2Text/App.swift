@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shared: AppDelegate?
     var settingsWindow: NSWindow?
     let overlay = OverlayController()
+    let muter = AudioMuter()
+    var signalSources: [DispatchSourceSignal] = []
     enum State { case loading, idle, recording, finishing }
     var item: NSStatusItem!
     var state: State = .loading { didSet { updateIcon() } }
@@ -58,6 +60,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         AppDelegate.shared = self
+        if AudioMuter.restoreFromDisk() { appLog("restored output volume left over from an interrupted recording") }
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig, SIG_IGN)
+            let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            src.setEventHandler { [weak self] in self?.muter.restore(); exit(0) }
+            src.resume()
+            signalSources.append(src)
+        }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         updateIcon()
         appLog("start: hotkey=\(settings.hotkey.displayName) model=\(settings.model) accelerator=\(settings.accelerator.rawValue)")
@@ -114,6 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session = s; recorder = r; recStart = nowS()
         hotkey.recording = true
         if settings.overlayEnabled { overlay.show() }
+        if settings.muteEnabled { muter.mute(to: Float(settings.muteLevel) / 100) }
         state = .recording
     }
 
@@ -121,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard state == .recording, let s = session, let r = recorder else { return }
         r.stop(); recorder = nil; session = nil
         hotkey.recording = false
+        muter.restore()
         overlay.hide()
         s.cancel()
         appLog(String(format: "cancelled (%@) after %.2fs", reason, nowS() - recStart))
@@ -133,6 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !allowShort && tRelease - recStart < 0.4 { cancelRecording("short hold < 0.4s"); return }
         r.stop(); recorder = nil; session = nil
         hotkey.recording = false
+        muter.restore()
         state = .finishing
         overlay.processing()
         Task {
@@ -165,5 +178,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !FileManager.default.fileExists(atPath: Paths.logFile) { appLog("log opened") }
         NSWorkspace.shared.open(URL(fileURLWithPath: Paths.logFile))
     }
+    func applicationWillTerminate(_ n: Notification) { muter.restore() }
     @objc func quit() { NSApp.terminate(nil) }
 }
