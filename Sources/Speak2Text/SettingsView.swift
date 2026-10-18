@@ -60,6 +60,8 @@ struct GeneralTab: View {
                         Text("\(s.muteLevel)%").monospacedDigit().frame(width: 40, alignment: .trailing)
                     }
                 }
+                Toggle(L("Start and stop sounds"), isOn: $s.soundsEnabled)
+                Toggle(L("Launch at login"), isOn: $s.launchAtLogin)
                 Toggle(L("Show overlay while recording"), isOn: $s.overlayEnabled)
                 Picker(L("Language"), selection: $s.language) {
                     Text("Русский").tag("ru")

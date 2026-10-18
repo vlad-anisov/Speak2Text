@@ -6,6 +6,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shared: AppDelegate?
     var settingsWindow: NSWindow?
+    var permWindow: NSWindow?
     let overlay = OverlayController()
     let muter = AudioMuter()
     var signalSources: [DispatchSourceSignal] = []
@@ -60,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let si = m.addItem(withTitle: L("Status: ") + st, action: nil, keyEquivalent: ""); si.isEnabled = false
         m.addItem(.separator())
+        m.addItem(withTitle: L("Permissions…"), action: #selector(openPermissions), keyEquivalent: "").target = self
         m.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: L("Open Log"), action: #selector(openLog), keyEquivalent: "").target = self
         m.addItem(.separator())
@@ -96,9 +98,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.$hotkey.combineLatest(settings.$mode).sink { [weak self] spec, mode in
             self?.hotkey.configure(spec: spec, toggleMode: mode == "toggle")
         }.store(in: &cancellables)
-        checkPerms(prompt: true)
+        checkPerms(prompt: false)
         permTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.checkPerms(prompt: false) }
-        AVCaptureDevice.requestAccess(for: .audio) { ok in appLog("microphone access: \(ok)") }
+        appLog("microphone access: \(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized)")
+        LoginItem.apply(settings.launchAtLogin)
+        settings.$launchAtLogin.dropFirst().receive(on: DispatchQueue.main).sink { LoginItem.apply($0) }.store(in: &cancellables)
+        let pm = PermissionsModel(); pm.refresh()
+        if !settings.onboarded || !pm.allOK { settings.onboarded = true; openPermissions() }
         manager.$status.receive(on: DispatchQueue.main).sink { [weak self] st in
             guard let self else { return }
             if st == .ready { if self.state == .loading { self.state = .idle } }
@@ -151,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session = s; recorder = r; recStart = nowS()
         hotkey.recording = true
         if settings.overlayEnabled { overlay.show() }
+        if settings.soundsEnabled { NSSound(named: "Tink")?.play() }
         if settings.muteEnabled { muter.mute(to: Float(settings.muteLevel) / 100) }
         state = .recording
     }
@@ -173,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         r.stop(); recorder = nil; session = nil
         hotkey.recording = false
         muter.restore()
+        if settings.soundsEnabled { NSSound(named: "Pop")?.play() }
         state = .finishing
         overlay.processing()
         Task {
@@ -186,6 +194,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.state = self.manager.status == .ready ? .idle : .loading
             }
         }
+    }
+
+    @objc func openPermissions() {
+        if permWindow == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: PermissionsView()))
+            w.title = "Speak2Text"
+            w.styleMask = [.titled, .closable]
+            w.isReleasedWhenClosed = false
+            w.center()
+            permWindow = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        permWindow?.makeKeyAndOrderFront(nil)
     }
 
     @objc func openSettings() {
