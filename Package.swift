@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "dictate",
-    platforms: [.macOS(.v15)],
+    name: "Speak2Text",
+    platforms: [.macOS(.v14)],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "1.1.1"),
     ],
     targets: [
         .executableTarget(
-            name: "dictate",
+            name: "Speak2Text",
             dependencies: [.product(name: "WhisperKit", package: "WhisperKit")],
-            path: "Sources/dictate",
+            path: "Sources/Speak2Text",
             swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]

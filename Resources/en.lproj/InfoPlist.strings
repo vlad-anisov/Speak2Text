@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Speak2Text records your voice while the hotkey is active and recognizes it locally.";
+"CFBundleDisplayName" = "Speak2Text";

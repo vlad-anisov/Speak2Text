@@ -20,8 +20,9 @@ func loadWav(_ path: String) throws -> [Float] {
 }
 
 func runFile(_ path: String) async {
-    let cfg = Config.load()
-    let engine = WhisperEngine(modelFolder: cfg.modelFolder, language: cfg.language, step: cfg.step)
+    let st = Settings.shared
+    guard let folder = ModelCatalog.folder(for: st.model) else { print("error: model \(st.model) not found"); exit(1) }
+    let engine = WhisperEngine(modelFolder: folder, accelerator: st.accelerator, language: st.language, step: st.step)
     do {
         let t = nowS()
         try await engine.load()

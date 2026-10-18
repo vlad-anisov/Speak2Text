@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Speak2Text записывает голос, пока активна горячая клавиша, и распознаёт его локально.";
+"CFBundleDisplayName" = "Speak2Text";

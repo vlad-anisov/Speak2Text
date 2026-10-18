@@ -2,8 +2,6 @@ import Foundation
 import CoreML
 import WhisperKit
 
-func nowS() -> Double { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 }
-
 func splitWords(_ s: String) -> [String] { s.split(whereSeparator: { $0.isWhitespace }).map(String.init) }
 func wordKey(_ w: String) -> String {
     String(w.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
@@ -24,16 +22,26 @@ final class LockedBuffer: @unchecked Sendable {
 final class WhisperEngine: @unchecked Sendable {
     var pipe: WhisperKit!
     let modelFolder: String
-    let language: String
+    let accelerator: Accelerator
     let step: Double
-    init(modelFolder: String, language: String, step: Double) {
-        self.modelFolder = modelFolder; self.language = language; self.step = step
+    /// "ru", "en" or "auto"; may change between dictations without reloading.
+    var language: String
+    /// Prompt token ids for the decoder (dictionary hints); set per session.
+    var promptTokens: [Int]?
+    init(modelFolder: String, accelerator: Accelerator, language: String, step: Double) {
+        self.modelFolder = modelFolder; self.accelerator = accelerator; self.language = language; self.step = step
+    }
+
+    static func computeOptions(_ a: Accelerator) -> ModelComputeOptions {
+        switch a {
+        case .ane: return ModelComputeOptions(melCompute: .all, audioEncoderCompute: .all, textDecoderCompute: .all)
+        case .gpu: return ModelComputeOptions(melCompute: .cpuAndGPU, audioEncoderCompute: .cpuAndGPU, textDecoderCompute: .cpuAndGPU)
+        case .cpu: return ModelComputeOptions(melCompute: .cpuOnly, audioEncoderCompute: .cpuOnly, textDecoderCompute: .cpuOnly)
+        }
     }
 
     func load() async throws {
-        let u = MLComputeUnits.all
-        let opts = ModelComputeOptions(melCompute: u, audioEncoderCompute: u, textDecoderCompute: u)
-        let cfg = WhisperKitConfig(modelFolder: modelFolder, computeOptions: opts, verbose: false, logLevel: .error, prewarm: false, load: true, download: false)
+        let cfg = WhisperKitConfig(modelFolder: modelFolder, computeOptions: WhisperEngine.computeOptions(accelerator), verbose: false, logLevel: .error, prewarm: false, load: true, download: false)
         pipe = try await WhisperKit(cfg)
         // warm up: two runs of 3 s of silence-ish noise (compiles/loads ANE graphs)
         let warm = [Float](repeating: 0, count: 48000)
@@ -41,7 +49,17 @@ final class WhisperEngine: @unchecked Sendable {
     }
 
     var decodeOptions: DecodingOptions {
-        DecodingOptions(verbose: false, task: .transcribe, language: language, temperature: 0.0, skipSpecialTokens: true, withoutTimestamps: false, wordTimestamps: false)
+        let auto = language == "auto"
+        return DecodingOptions(verbose: false, task: .transcribe, language: auto ? nil : language, temperature: 0.0, detectLanguage: auto ? true : nil,
+                               skipSpecialTokens: true, withoutTimestamps: false, wordTimestamps: false, promptTokens: promptTokens)
+    }
+
+    /// Token ids for a list of hint terms (special tokens dropped).
+    func tokens(forPrompt terms: [String]) -> [Int]? {
+        guard let tok = pipe?.tokenizer, !terms.isEmpty else { return nil }
+        let begin = tok.specialTokens.specialTokenBegin
+        let ids = tok.encode(text: " " + terms.joined(separator: ", ")).filter { $0 < begin }
+        return ids.isEmpty ? nil : ids
     }
 
     func newSession() -> LiveTranscriber { LiveTranscriber(engine: self) }

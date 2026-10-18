@@ -5,7 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     enum State { case loading, idle, recording, finishing }
     var item: NSStatusItem!
     var state: State = .loading { didSet { updateIcon() } }
-    let cfg = Config.load()
+    let settings = Settings.shared
     var engine: WhisperEngine!
     var hotkey: Hotkey!
     var recorder: Recorder?
@@ -35,16 +35,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let m = NSMenu()
         if !inputOK || !axOK {
             var miss: [String] = []
-            if !inputOK { miss.append("Мониторинг ввода") }
-            if !axOK { miss.append("Универсальный доступ") }
-            m.addItem(withTitle: "⚠️ Нет доступа: " + miss.joined(separator: ", "), action: nil, keyEquivalent: "")
-            if !inputOK { let i = m.addItem(withTitle: "Открыть: Мониторинг ввода", action: #selector(openInput), keyEquivalent: ""); i.target = self }
-            if !axOK { let i = m.addItem(withTitle: "Открыть: Универсальный доступ", action: #selector(openAX), keyEquivalent: ""); i.target = self }
+            if !inputOK { miss.append(L("Input Monitoring")) }
+            if !axOK { miss.append(L("Accessibility")) }
+            m.addItem(withTitle: "⚠️ " + L("Missing permissions: ") + miss.joined(separator: ", "), action: nil, keyEquivalent: "")
+            if !inputOK { let i = m.addItem(withTitle: L("Input Monitoring") + "…", action: #selector(openInput), keyEquivalent: ""); i.target = self }
+            if !axOK { let i = m.addItem(withTitle: L("Accessibility") + "…", action: #selector(openAX), keyEquivalent: ""); i.target = self }
             m.addItem(.separator())
         }
-        m.addItem(withTitle: "Open log", action: #selector(openLog), keyEquivalent: "").target = self
+        m.addItem(withTitle: L("Open Log"), action: #selector(openLog), keyEquivalent: "").target = self
         m.addItem(.separator())
-        m.addItem(withTitle: "Quit", action: #selector(quit), keyEquivalent: "q").target = self
+        m.addItem(withTitle: L("Quit"), action: #selector(quit), keyEquivalent: "q").target = self
         item.menu = m
     }
     @objc func openInput() { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!) }
@@ -53,10 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         updateIcon()
-        appLog("start: hotkey=\(cfg.hotkey) model=\((cfg.modelFolder as NSString).lastPathComponent)")
+        appLog("start: hotkey=\(settings.hotkey.displayName) model=\(settings.model) accelerator=\(settings.accelerator.rawValue)")
 
-        engine = WhisperEngine(modelFolder: cfg.modelFolder, language: cfg.language, step: cfg.step)
-        hotkey = Hotkey(name: cfg.hotkey)
+        guard let folder = ModelCatalog.folder(for: settings.model) else { appLog("model not downloaded: \(settings.model)"); return }
+        engine = WhisperEngine(modelFolder: folder, accelerator: settings.accelerator, language: settings.language, step: settings.step)
+        hotkey = Hotkey(name: "right_option")
         hotkey.onDown = { [weak self] in self?.pressed() }
         hotkey.onUp = { [weak self] in self?.released() }
         hotkey.onCancel = { [weak self] r in self?.cancelRecording(r) }
@@ -124,8 +125,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openLog() {
-        if !FileManager.default.fileExists(atPath: logPath) { appLog("log opened") }
-        NSWorkspace.shared.open(URL(fileURLWithPath: logPath))
+        if !FileManager.default.fileExists(atPath: Paths.logFile) { appLog("log opened") }
+        NSWorkspace.shared.open(URL(fileURLWithPath: Paths.logFile))
     }
     @objc func quit() { NSApp.terminate(nil) }
 }
