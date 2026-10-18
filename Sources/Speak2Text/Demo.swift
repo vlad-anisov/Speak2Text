@@ -3,9 +3,16 @@ import Cocoa
 /// Screenshot helper: capture one window with the system tool.
 func captureWindow(_ w: NSWindow, to path: String) {
     try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+    // Capture at 2x: move the window to a Retina screen if it sits on a 1x one.
+    if (w.screen?.backingScaleFactor ?? 1) < 2, let retina = NSScreen.screens.first(where: { $0.backingScaleFactor >= 2 }) {
+        let v = retina.visibleFrame
+        w.setFrameOrigin(NSPoint(x: v.midX - w.frame.width / 2, y: v.midY - w.frame.height / 2))
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
     let p = Process()
     p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-    p.arguments = ["-x", "-l", String(w.windowNumber), path]
+    // -o: no window shadow, so the image has no extra frame around the window.
+    p.arguments = ["-x", "-o", "-l", String(w.windowNumber), path]
     try? p.run(); p.waitUntilExit()
     print("screenshot: \(path) exit=\(p.terminationStatus)")
 }

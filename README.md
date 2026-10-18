@@ -55,7 +55,7 @@ Press a key, say what you want to write, press it again: the text appears in the
    - **Microphone**: to record your voice
    - **Input Monitoring**: to see the hotkey
    - **Accessibility**: to paste the text into the active app
-4. Wait until the status next to **Accelerator** says **Ready**. The first launch downloads the model and prepares it for the Neural Engine, which takes a few minutes; later launches take seconds. Keep the app running meanwhile.
+4. Wait until the status next to **Accelerator** says **Ready**. The first launch downloads the speech model (632 MB, once) and prepares it for the Neural Engine, which takes a few minutes; later launches take seconds. Keep the app running meanwhile.
 
 That's it: press **Right Option**, speak, press it again.
 
@@ -108,47 +108,29 @@ Regenerate the start/stop sounds with `python3 scripts/make_sounds.py`. See [doc
 
 ## Screenshots
 
-<table align="center">
-<tr>
-<td align="center"><b>History</b><br>
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-general.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-general.png">
+  <img src="docs/screenshots/settings-general.png" width="720" alt="General">
+</picture>
+</p>
+
+<p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-history.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-history.png">
-  <img src="docs/screenshots/settings-history.png" width="400" alt="History">
-</picture></td>
-<td align="center"><b>About</b><br>
+  <img src="docs/screenshots/settings-history.png" width="720" alt="History">
+</picture>
+</p>
+
+<p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-about.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/settings-about.png">
-  <img src="docs/screenshots/settings-about.png" width="400" alt="About">
-</picture></td>
-</tr>
-</table>
-
-<table align="center">
-<tr>
-<td align="center"><b>Listening</b></td>
-<td align="center"><b>Processing</b></td>
-<td align="center"><b>Done</b></td>
-</tr>
-<tr>
-<td align="center"><picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overlay-listening.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/overlay-listening.png">
-  <img src="docs/screenshots/overlay-listening.png" height="60" alt="Listening">
-</picture></td>
-<td align="center"><picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overlay-processing.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/overlay-processing.png">
-  <img src="docs/screenshots/overlay-processing.png" height="60" alt="Processing">
-</picture></td>
-<td align="center"><picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overlay-done.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/light/overlay-done.png">
-  <img src="docs/screenshots/overlay-done.png" height="60" alt="Done">
-</picture></td>
-</tr>
-</table>
+  <img src="docs/screenshots/settings-about.png" width="720" alt="About">
+</picture>
+</p>
 
 ## Privacy
 
