@@ -5,9 +5,9 @@ enum TextProcessor {
     private static let wordChar = "[\\p{L}\\p{N}_]"
 
     /// Always removed when they stand alone as a word.
-    static let strongFillers = ["э", "ээ", "эээ", "эм", "ээм", "um", "umm", "uh", "uhh"]
+    static let strongFillers = ["э", "ээ", "эээ", "э-э", "э-э-э", "эм", "эмм", "ээм", "um", "umm", "uh", "uhh"]
     /// Real words too, so they are removed only when followed by a comma ("Ну, давай", "Это, как бы, важно").
-    static let weakFillers = ["ну", "типа", "как бы", "короче", "вот"]
+    static let weakFillers = ["ну", "ну вот", "типа", "как бы", "так сказать", "короче", "вот"]
 
     static func process(_ text: String, fillers: Bool) -> String {
         var t = BuiltinDictionary.apply(text)
@@ -69,7 +69,14 @@ enum TextProcessor {
             ("Настроил сиай", false, "Настроил CI"),
             ("Запустил два пайплайна", false, "Запустил два pipeline"),
             ("Чинил пайплайны всю неделю", false, "Чинил pipelines всю неделю"),
+            ("Открыл МР и выложил на стейдж, потом влил в девелоп", false, "Открыл MR и выложил на stage, потом влил в develop"),
+            ("Спросил у клода, потом у джемини и дипсик", false, "Спросил у Claude, потом у Gemini и DeepSeek"),
+            ("Антропик выпустил ллм", false, "Anthropic выпустил LLM"),
+            ("Скинул пдф на макбук и айфон", false, "Скинул PDF на MacBook и iPhone"),
+            ("Код ревью и деплой на стейджинг", false, "Code review и deploy на staging"),
             // replacements: must NOT change
+            ("Мастер ветка и релиз без токенов", false, "Мастер ветка и релиз без токенов"),
+            ("Девелопер и девелоперы пишут код", false, "Девелопер и девелоперы пишут код"),
             ("Это баг, а не фича, поправь код", false, "Это баг, а не фича, поправь код"),
             ("Сыграй на гитаре, гита здесь ни при чём", false, "Сыграй на гитаре, гита здесь ни при чём"),
             ("Докеры разгрузили порт", false, "Докеры разгрузили порт"),
@@ -82,7 +89,13 @@ enum TextProcessor {
             ("Мы э сделали, типа, всё", true, "Мы сделали, всё"),
             ("Он вышел. Короче, вопрос есть", true, "Он вышел. Вопрос есть"),
             ("I um think uh this works", true, "I think this works"),
+            ("Ну вот, давай начнём", true, "Давай начнём"),
+            ("Это, так сказать, важно", true, "Это, важно"),
+            ("Мы э-э сделали и эмм проверили", true, "Мы сделали и проверили"),
             // fillers: must NOT change
+            ("Слушай, это важно, вот смотри", true, "Слушай, это важно, вот смотри"),
+            ("Значит, делаем так, то есть вот так", true, "Значит, делаем так, то есть вот так"),
+            ("Ну вот это и есть ответ", true, "Ну вот это и есть ответ"),
             ("Определение типа данных", true, "Определение типа данных"),
             ("Ну и ну, как бы вы поступили?", true, "Ну и ну, как бы вы поступили?"),
             ("Вот это да, стал короче", true, "Вот это да, стал короче"),
@@ -95,6 +108,27 @@ enum TextProcessor {
             let p = got == want; ok = ok && p
             print(p ? "PASS" : "FAIL", "'\(inp)' ->", "'\(got)'", p ? "" : "expected '\(want)'")
         }
+        if ProcessInfo.processInfo.environment["S2T_BENCH"] != nil { bench() }
         return ok
+    }
+
+    /// Timing of the whole post-processing (replacements + fillers): median of 101 runs, in ms.
+    static func bench() {
+        let base = "Слушай, ну я вчера, типа, настроил пайплайн в гитлабе и залил в гитхаб, потом сделал деплой на стейдж. Короче, мёрдж реквест открыт, э надо глянуть код ревью в джире, вот. Это обычный текст без терминов, который просто идёт дальше и дальше. "
+        for n in [100, 1000, 5000] {
+            var text = ""
+            while text.count < n { text += base }
+            text = String(text.prefix(n))
+            for f in [true, false] {
+                var times = [Double](), out = ""
+                for _ in 0..<101 {
+                    let t0 = DispatchTime.now().uptimeNanoseconds
+                    out = process(text, fillers: f)
+                    times.append(Double(DispatchTime.now().uptimeNanoseconds - t0) / 1e6)
+                }
+                let s = times.sorted()
+                print(String(format: "BENCH chars=%d fillers=%@ median=%.3f ms min=%.3f max=%.3f outlen=%d", n, f ? "on" : "off", s[50], s[0], s[100], out.count))
+            }
+        }
     }
 }

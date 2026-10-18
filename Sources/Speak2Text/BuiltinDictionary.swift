@@ -34,12 +34,17 @@ enum BuiltinDictionary {
     мерж реквест | merge request
     мёрж реквест | merge request
     мердж реквест | merge request
+    !мр | MR
+    эм ар | MR
     !мёрдж реквесты | merge requests
     !мерж реквесты | merge requests
     код ревью | code review
     коде ревью | code review
     кодревью | code review
     # ci/cd and infrastructure
+    стейдж | stage
+    стейджинг | staging
+    девелоп | develop
     пайплайн | pipeline
     !пайплайны | pipelines
     !пайплайнов | pipelines
@@ -146,7 +151,6 @@ enum BuiltinDictionary {
     тимс | Teams
     майкрософт тимс | Microsoft Teams
     гугл докс | Google Docs
-    гугл докс | Google Docs
     гугл шитс | Google Sheets
     гугл мит | Google Meet
     гугл драйв | Google Drive
@@ -162,6 +166,12 @@ enum BuiltinDictionary {
     чатджипити | ChatGPT
     чат джипити | ChatGPT
     чат гпт | ChatGPT
+    ллм | LLM
+    эл эл эм | LLM
+    мцп | MCP
+    эм си пи | MCP
+    дипсик | DeepSeek
+    джемини | Gemini
     чатгпт | ChatGPT
     джипити | GPT
     опенаи | OpenAI
@@ -170,7 +180,11 @@ enum BuiltinDictionary {
     клод | Claude
     клауд код | Claude Code
     копайлот | Copilot
-    # platforms
+    # platforms and devices
+    пдф | PDF
+    макбук | MacBook
+    айфон | iPhone
+    айпад | iPad
     иос | iOS
     айос | iOS
     макос | macOS
